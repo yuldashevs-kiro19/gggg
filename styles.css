@@ -405,11 +405,13 @@ body {
   -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
 }
 .module-img-mark {
-  position: relative; z-index: 1;
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
   font-family: "Orbitron"; font-weight: 900;
   font-size: clamp(22px, 2.4vw, 30px);
   color: rgba(255,255,255,0.22); letter-spacing: 4px;
   transition: .35s;
+  z-index: 0; pointer-events: none; text-align: center;
 }
 .module:hover .module-img-mark { color: rgba(255,255,255,0.5); transform: scale(1.05); text-shadow: var(--glow); }
 .module-img::after {
@@ -2161,7 +2163,7 @@ body.maintenance-on > *:not(.maintenance):not(.bg-base):not(.bg-glow):not(.bg-vi
 /* ===== Video preview in module card ===== */
 .module-video {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; pointer-events: none; z-index: 0;
+  object-fit: cover; pointer-events: none; z-index: 2;
   filter: brightness(0.7);
   transition: filter .3s, transform .3s;
 }

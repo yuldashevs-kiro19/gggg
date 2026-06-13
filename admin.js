@@ -1079,8 +1079,9 @@ function renderGames(root) {
 }
 function openGameEditor(key, onDone) {
   const isNew = !key;
-  const g = isNew ? { key: "", name: "", short: "", ac: "", status: "UNDETECTED" }
-                  : Store.getGames().find(x => x.key === key) || { key, name: "", short: "", ac: "", status: "UNDETECTED" };
+  const g = isNew ? { key: "", name: "", short: "", ac: "", status: "UNDETECTED", image: "" }
+                  : Store.getGames().find(x => x.key === key) || { key, name: "", short: "", ac: "", status: "UNDETECTED", image: "" };
+  let gImage = g.image || "";
   const editor = document.createElement("div");
   editor.className = "ap-editor open";
   editor.innerHTML = `
@@ -1100,6 +1101,15 @@ function openGameEditor(key, onDone) {
         <div class="ape-full"><label class="ape-label">STATUS</label>
           <select class="ape-input" id="gStatus">${Store.STATUSES.map(s=>`<option ${s===g.status?"selected":""}>${s}</option>`).join("")}</select>
         </div>
+        <div class="ape-full">
+          <label class="ape-label">IMAGE (cover)</label>
+          <div class="ape-images" id="gImageBox"></div>
+          <div style="display:flex; gap:8px; margin-top:6px">
+            <button class="btn btn-ghost" id="gImageAdd" type="button">+ UPLOAD</button>
+            <button class="btn btn-ghost" id="gImageDel" type="button">CLEAR</button>
+            <input type="file" id="gImageFile" accept="image/*" hidden/>
+          </div>
+        </div>
       </div>
       <footer class="ape-foot">
         <button class="btn btn-ghost" data-close="1">CANCEL</button>
@@ -1110,6 +1120,23 @@ function openGameEditor(key, onDone) {
   document.body.appendChild(editor);
   function close() { editor.remove(); }
   editor.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+  function paintImage() {
+    $("#gImageBox", editor).innerHTML = gImage
+      ? `<div class="ape-image" style="background-image:url('${gImage}')"></div>`
+      : `<div class="ape-image-empty">No image yet</div>`;
+  }
+  paintImage();
+  $("#gImageAdd", editor).addEventListener("click", () => $("#gImageFile", editor).click());
+  $("#gImageDel", editor).addEventListener("click", () => { gImage = ""; paintImage(); });
+  $("#gImageFile", editor).addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      gImage = await readImageResized(file, 800);
+      paintImage();
+    } catch (err) { showToast("Failed to read " + file.name, "ERROR", "err"); }
+    e.target.value = "";
+  });
   $("#gSave", editor).addEventListener("click", () => {
     const newG = {
       key:   $("#gKey", editor).value.trim() || g.key,
@@ -1117,6 +1144,7 @@ function openGameEditor(key, onDone) {
       name:  $("#gName", editor).value.trim(),
       ac:    $("#gAc", editor).value.trim(),
       status:$("#gStatus", editor).value,
+      image: gImage,
     };
     if (!newG.key || !newG.name) { showToast("Key and name required", "ERROR", "err"); return; }
     Store.upsertGame(newG); showToast("Saved", "GAME"); close(); onDone && onDone();

@@ -509,7 +509,7 @@ function renderModules(filter = "all") {
           ${coverHtml}
           <span class="module-status ${statusClass}"><span class="ms-dot"></span>${m.status}</span>
           <span class="module-rating">★ ${m.rating}</span>
-          ${(hasVideo || coverUrl) ? "" : `<span class="module-img-mark">${m.short}</span><div class="module-img-grid"></div>`}
+          ${(hasVideo || coverUrl) ? "" : `<span class="module-img-mark">${m.short || (m.name||"").split(/\s+/)[0].toUpperCase() || "?"}</span><div class="module-img-grid"></div>`}
         </div>
         <div class="module-content">
           <div class="module-row">
