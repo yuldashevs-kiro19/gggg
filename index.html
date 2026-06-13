@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KERNELAB — Kernel-Level Game Manipulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===== Background layers ===== -->
+  <!-- ===== Background layers ===== -->
+  <div class="bg-base"></div>
+  <div class="bg-grid-wrap"><div class="bg-grid"></div></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-particles" id="particles"></div>
+  <div class="bg-code" id="bgCode"></div>
+  <div class="bg-scanlines"></div>
+  <div class="bg-vignette"></div>
+
+  <!-- ===== Custom crosshair cursor ===== -->
+  <div class="crosshair" id="crosshair">
+    <span class="ch-line ch-top"></span>
+    <span class="ch-line ch-bottom"></span>
+    <span class="ch-line ch-left"></span>
+    <span class="ch-line ch-right"></span>
+    <span class="ch-dot"></span>
+    <span class="ch-ring"></span>
+  </div>
+
+  <!-- ===== Toast notifications ===== -->
+  <div class="toasts" id="toasts"></div>
+
+  <!-- ===== Maintenance overlay ===== -->
+  <div class="maintenance" id="maintenance">
+    <div class="mt-bg"></div>
+    <div class="mt-card">
+      <div class="wc-corner tl"></div><div class="wc-corner tr"></div>
+      <div class="wc-corner bl"></div><div class="wc-corner br"></div>
+      <span class="welcome-tag">// SYSTEM OFFLINE · MAINTENANCE</span>
+      <h1 class="mt-title glitch" id="mtTitle" data-text="TECHNICAL BREAK">TECHNICAL BREAK</h1>
+      <p class="mt-msg" id="mtMsg">Engine is undergoing kernel-level maintenance. We'll be back shortly.</p>
+      <div class="mt-eta" id="mtEta">ETA: 30 minutes</div>
+      <div class="mt-loader">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="mt-status">
+        <span class="dot"></span>
+        <span>RECONNECTION ATTEMPT IN PROGRESS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Welcome wheel of fortune ===== -->
+  <div class="welcome" id="welcome">
+    <div class="welcome-backdrop"></div>
+    <div class="welcome-card">
+      <div class="wc-corner tl"></div><div class="wc-corner tr"></div>
+      <div class="wc-corner bl"></div><div class="wc-corner br"></div>
+      <span class="welcome-tag">// FIRST-CONNECT BONUS · ONE SPIN PER CUSTOMER</span>
+      <h2 class="welcome-title glitch" data-text="SPIN THE WHEEL">SPIN THE WHEEL</h2>
+      <p class="welcome-desc">Spin to unlock a single-use discount code. Up to 30% off any module. Code expires in 24 hours.</p>
+
+      <div class="wheel-stage">
+        <div class="wheel-pointer"></div>
+        <div class="wheel-rings">
+          <span class="wr wr-1"></span>
+          <span class="wr wr-2"></span>
+          <span class="wr wr-3"></span>
+        </div>
+        <div class="wheel" id="wheel">
+          <svg viewBox="-100 -100 200 200" id="wheelSvg" aria-hidden="true"></svg>
+          <button class="wheel-hub" id="wheelSpin" type="button">
+            <span class="hub-text">SPIN</span>
+            <span class="hub-sub">x1 LEFT</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="welcome-result" id="welcomeResult">
+        <div class="result-prize">
+          <span class="result-prize-num" id="resultNum">—</span>
+          <span class="result-prize-suf" id="resultSuf">%</span>
+          <span class="result-prize-lbl">DISCOUNT UNLOCKED</span>
+        </div>
+        <div class="result-code">
+          <span class="rc-label">CODE:</span>
+          <code class="rc-code" id="resultCode">·····</code>
+          <button class="rc-copy" id="resultCopy" type="button">COPY</button>
+        </div>
+        <button class="btn btn-primary btn-shine" id="welcomeClose" type="button">› ENTER FACILITY</button>
+      </div>
+
+      <button class="welcome-skip" id="welcomeSkip" type="button">skip ›</button>
+    </div>
+  </div>
+
+  <!-- ===== Payment modal ===== -->
+  <div class="payment-modal" id="paymentModal" aria-hidden="true">
+    <div class="payment-backdrop" data-pay-close="1"></div>
+    <div class="payment-panel">
+      <button class="payment-close" id="paymentClose" type="button">×</button>
+      <div class="pay-corner tl"></div><div class="pay-corner tr"></div>
+      <div class="pay-corner bl"></div><div class="pay-corner br"></div>
+
+      <div class="payment-header">
+        <span class="payment-icon">▤</span>
+        <span class="payment-title">PAYMENT</span>
+      </div>
+
+      <div class="payment-plan">
+        <div class="pp-flex">
+          <div>
+            <div class="pp-label">PLAN</div>
+            <div class="pp-name" id="payPlan">—</div>
+          </div>
+          <div class="pp-amount">
+            <div class="pp-label">AMOUNT</div>
+            <div class="pp-price" id="payPrice">$0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="payment-field">
+        <span class="pf-icon">✉</span>
+        <input type="email" id="payEmail" placeholder="you@email.com" autocomplete="email" />
+      </div>
+      <p class="payment-hint">Your key and receipt will be sent to this email.</p>
+
+      <div class="payment-promo">
+        <div class="pp-label">PROMO CODE</div>
+        <div class="promo-row">
+          <input type="text" id="payPromo" placeholder="ENTER CODE" />
+          <button class="promo-apply" id="promoApply" type="button">APPLY</button>
+        </div>
+        <div class="promo-status" id="promoStatus"></div>
+      </div>
+
+      <div class="payment-methods">
+        <div class="pp-label">PAYMENT METHOD</div>
+        <p class="payment-hint">Choose how to pay.</p>
+        <button class="pay-method" data-method="ru" type="button">
+          <div class="pm-info">
+            <div class="pm-name">RU CARDS</div>
+            <div class="pm-tags"><span class="pm-tag">⚡ СБП</span></div>
+          </div>
+          <span class="pm-arrow">›</span>
+        </button>
+        <button class="pay-method" data-method="eu" type="button">
+          <div class="pm-info">
+            <div class="pm-name">EU/US CARDS</div>
+            <div class="pm-tags">
+              <span class="pm-tag">G Pay</span>
+              <span class="pm-tag">▤ Card</span>
+              <span class="pm-tag"> Apple</span>
+            </div>
+          </div>
+          <span class="pm-arrow">›</span>
+        </button>
+        <button class="pay-method" data-method="ltc" type="button">
+          <div class="pm-info">
+            <div class="pm-name">CRYPTO</div>
+            <div class="pm-tags"><span class="pm-tag">Ł LTC</span></div>
+          </div>
+          <span class="pm-arrow">›</span>
+        </button>
+        <button class="pay-method" data-method="btc" type="button">
+          <div class="pm-info">
+            <div class="pm-name">CRYPTO</div>
+            <div class="pm-tags"><span class="pm-tag">₿ BTC</span></div>
+          </div>
+          <span class="pm-arrow">›</span>
+        </button>
+      </div>
+
+      <button class="payment-cancel" id="paymentCancel" type="button">CANCEL</button>
+    </div>
+  </div>
+
+  <!-- ===== Product modal ===== -->
+  <div class="product-modal" id="productModal" aria-hidden="true">
+    <div class="product-backdrop" data-close="1"></div>
+    <div class="product-panel">
+      <button class="product-close" id="productClose" type="button">×</button>
+      <div class="pm-corner tl"></div><div class="pm-corner tr"></div>
+      <div class="pm-corner bl"></div><div class="pm-corner br"></div>
+
+      <div class="product-gallery">
+        <div class="pg-main" id="pgMain">
+          <div class="pg-placeholder"><span class="pg-ph-text">SCREENSHOT</span></div>
+          <div class="pg-overlay-grid"></div>
+          <span class="pg-tag" id="pgTag">PREVIEW · 01/04</span>
+        </div>
+        <div class="pg-thumbs" id="pgThumbs"></div>
+      </div>
+
+      <div class="product-body">
+        <!-- Left: pricing -->
+        <aside class="product-pricing">
+          <div class="pp-head">
+            <span class="kicker">// SUBSCRIPTION TIERS</span>
+            <h3 class="pp-title" id="pmName">Module</h3>
+            <div class="pp-id" id="pmId">—</div>
+          </div>
+          <div class="pp-tiers" id="pmTiers"></div>
+          <div class="pp-total">
+            <span>TOTAL</span>
+            <span class="pp-total-val" id="pmTotal">$0</span>
+          </div>
+          <button class="btn btn-primary btn-shine pp-buy" id="pmBuy" type="button">PURCHASE NOW</button>
+          <div class="pp-trust">
+            <span>✓ Instant delivery</span>
+            <span>✓ Crypto accepted</span>
+            <span>✓ 24/7 support</span>
+          </div>
+        </aside>
+
+        <!-- Right: details -->
+        <main class="product-info">
+          <div class="pi-section">
+            <span class="kicker">// DESCRIPTION</span>
+            <p class="pi-desc" id="pmDesc">—</p>
+          </div>
+          <div class="pi-section">
+            <span class="kicker">// FUNCTIONALITY</span>
+            <div class="pi-features" id="pmFeatures"></div>
+          </div>
+          <div class="pi-section">
+            <span class="kicker">// SUPPORTED TITLES</span>
+            <div class="pi-games" id="pmGames"></div>
+          </div>
+          <div class="pi-section">
+            <span class="kicker">// SYSTEM REQUIREMENTS</span>
+            <table class="pi-req" id="pmReq"></table>
+          </div>
+          <div class="pi-section">
+            <span class="kicker">// CUSTOMER REVIEWS</span>
+            <div class="pi-reviews-summary" id="pmReviewsSummary"></div>
+            <div class="pi-reviews" id="pmReviews"></div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Header ===== -->
+  <header class="header">
+    <a href="#" class="logo" data-text="KERNELAB">
+      <span class="logo-hash">#</span>
+      <span class="logo-text">KERNEL<span class="logo-accent">AB</span></span>
+    </a>
+    <nav class="nav">
+      <a href="#engine" class="nav-link">Engine</a>
+      <a href="#games" class="nav-link">Games</a>
+      <a href="#modules" class="nav-link">Loadout</a>
+      <a href="#protocol" class="nav-link">Protocol</a>
+      <a href="#testimonials" class="nav-link">Reviews</a>
+      <a href="#contact" class="nav-link">Contact</a>
+      <a href="#feed" class="nav-link">Live</a>
+    </nav>
+    <button class="btn btn-primary btn-shine">INJECT NOW</button>
+  </header>
+
+  <!-- ===== Hero ===== -->
+  <section class="hero" id="engine">
+    <div class="hero-left">
+      <div class="hero-badge"><span class="pulse-dot"></span> CLASSIFIED ENGINE · UNDETECTED 240+ DAYS</div>
+      <h1 class="hero-title glitch" data-text="KERNELAB">KERNELAB</h1>
+      <div class="hero-rotator">
+        <span class="caret">&gt;</span>
+        <span class="type" id="typeLine"></span><span class="type-cursor">_</span>
+      </div>
+      <p class="hero-sub">
+        Kernel-resident loader maps game memory, neutralizes anti-cheat callbacks
+        and spawns aimbot, ESP and triggerbot routines directly inside the target
+        process. Stream-proof, HWID-spoofed, zero-trace.
+      </p>
+      <div class="hero-buttons">
+        <a href="#games" class="btn btn-primary btn-shine">› PICK A GAME</a>
+        <a href="#modules" class="btn btn-ghost">VIEW LOADOUT</a>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="terminal">
+      <div class="terminal-bar">
+        <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+        <span class="terminal-title">kernelab · injector · ring0</span>
+      </div>
+      <div class="terminal-body" id="terminalBody"></div>
+    </div>
+  </section>
+
+  <!-- ===== Stats ===== -->
+  <section class="stats" id="stats"></section>
+
+  <!-- ===== Games ===== -->
+  <section class="section" id="games">
+    <div class="section-head">
+      <span class="kicker">// BATTLEFIELD SELECT</span>
+      <h2 class="section-title">Pick Your Game</h2>
+      <p class="section-desc">Each title has a dedicated kernel build, hand-tuned for its anti-cheat. Tap a card to filter the loadout.</p>
+    </div>
+    <div class="games-grid" id="gamesGrid"></div>
+  </section>
+
+  <!-- ===== Modules ===== -->
+  <section class="section" id="modules">
+    <div class="section-head">
+      <span class="kicker">// TACTICAL LOADOUT</span>
+      <h2 class="section-title">Modules · <span id="loadoutFilterLabel">All Games</span></h2>
+      <p class="section-desc">Click any dossier to view tiers, screenshots and full system requirements.</p>
+      <button class="loadout-clear" id="loadoutClear" type="button" hidden>× SHOW ALL GAMES</button>
+    </div>
+    <div class="modules" id="modules-grid"></div>
+  </section>
+
+  <!-- ===== Protocol ===== -->
+  <section class="section" id="protocol">
+    <div class="section-head">
+      <span class="kicker">// INJECTION PIPELINE</span>
+      <h2 class="section-title">Four-Stage Protocol</h2>
+    </div>
+    <div class="protocol" id="protocol-grid"></div>
+  </section>
+
+  <!-- ===== Testimonials ===== -->
+  <section class="section testimonials" id="testimonials">
+    <div class="section-head">
+      <span class="kicker">// CUSTOMER TESTIMONIALS</span>
+      <h2 class="section-title">What Customers Say</h2>
+      <p class="section-desc">Verified feedback from real customers across all modules. Hover to pause, click any card to open its dossier.</p>
+    </div>
+    <div class="reviews-marquee">
+      <div class="reviews-row" id="reviewsRow1"></div>
+      <div class="reviews-row reverse" id="reviewsRow2"></div>
+    </div>
+  </section>
+
+  <!-- ===== Live feed ===== -->
+  <section class="section" id="feed">
+    <div class="section-head">
+      <span class="kicker">// LIVE INJECTION FEED</span>
+      <h2 class="section-title">Customer Online</h2>
+    </div>
+    <div class="terminal wide">
+      <div class="terminal-bar">
+        <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+        <span class="terminal-title">kernelab inject --target cs2.exe --mode kernel</span>
+      </div>
+      <div class="terminal-body" id="feedBody"></div>
+    </div>
+  </section>
+
+  <!-- ===== Contact ===== -->
+  <section class="section contact" id="contact">
+    <div class="section-head">
+      <span class="kicker">// CONTACT</span>
+      <h2 class="section-title">Get in Touch</h2>
+      <p class="section-desc">Direct line to the operator team. 24/7 support across two channels.</p>
+    </div>
+    <div class="contact-grid" id="contactGrid"></div>
+  </section>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <div class="footer-top">
+      <div class="logo" data-text="KERNELAB">
+        <span class="logo-hash">#</span>
+        <span class="logo-text">KERNEL<span class="logo-accent">AB</span></span>
+      </div>
+      <p>An elite kernel-level game manipulation framework for customers who refuse to lose. Undetected, stream-proof, HWID-spoofed.</p>
+    </div>
+    <div class="footer-status">
+      <span>DRIVER <b>LOADED</b></span>
+      <span>ANTI-CHEAT <b>BYPASSED</b></span>
+      <span>HWID <b>SPOOFED</b></span>
+    </div>
+    <div class="footer-links" id="footerLinks"></div>
+  </footer>
+  <div class="copyright">© 2026 KERNELAB — CLASSIFIED FRAMEWORK · CUSTOMER USE ONLY</div>
+
+  <script src="store.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KERNELAB · FAQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="legal-body">
+  <div class="bg-base"></div>
+  <div class="bg-grid-wrap"><div class="bg-grid"></div></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-vignette"></div>
+
+  <div class="crosshair" id="crosshair">
+    <span class="ch-line ch-top"></span><span class="ch-line ch-bottom"></span>
+    <span class="ch-line ch-left"></span><span class="ch-line ch-right"></span>
+    <span class="ch-dot"></span><span class="ch-ring"></span>
+  </div>
+
+  <header class="header">
+    <a href="index.html" class="logo" data-text="KERNELAB">
+      <span class="logo-hash">#</span>
+      <span class="logo-text">KERNEL<span class="logo-accent">AB</span></span>
+    </a>
+    <nav class="nav">
+      <a href="index.html#engine" class="nav-link">Engine</a>
+      <a href="index.html#games" class="nav-link">Games</a>
+      <a href="index.html#modules" class="nav-link">Loadout</a>
+      <a href="index.html#contact" class="nav-link">Contact</a>
+      <a href="faq.html" class="nav-link active">FAQ</a>
+      <a href="terms.html" class="nav-link">Terms</a>
+    </nav>
+    <a href="index.html" class="btn btn-ghost">› BACK TO SITE</a>
+  </header>
+
+  <section class="legal-page">
+    <div class="legal-head">
+      <span class="kicker">// FREQUENTLY ASKED</span>
+      <h1 class="hero-title glitch" data-text="FAQ">FAQ</h1>
+      <p class="legal-sub">Everything customers ask before they buy. If your question isn't here, hit us up on Discord or Telegram.</p>
+    </div>
+    <div class="faq-list" id="faqList"></div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-top">
+      <div class="logo" data-text="KERNELAB">
+        <span class="logo-hash">#</span>
+        <span class="logo-text">KERNEL<span class="logo-accent">AB</span></span>
+      </div>
+      <p>An elite kernel-level game manipulation framework. Undetected, stream-proof, HWID-spoofed.</p>
+    </div>
+    <div class="footer-links" id="footerLinks"></div>
+  </footer>
+  <div class="copyright">© 2026 KERNELAB — CLASSIFIED FRAMEWORK · CUSTOMER USE ONLY</div>
+
+  <script src="store.js"></script>
+  <script>
+    /* Reuse crosshair from main */
+    (function(){
+      const c = document.getElementById("crosshair");
+      if (!c) return;
+      c.style.opacity = "0";
+      c.style.transform = "translate(-9999px,-9999px)";
+      let activated = false;
+      document.addEventListener("mousemove", e => {
+        if (!activated) { activated = true; document.body.classList.add("crosshair-active"); c.style.opacity = "1"; }
+        c.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+      }, { passive: true });
+      document.addEventListener("mouseleave", () => c.style.opacity="0");
+      document.addEventListener("mouseenter", () => activated && (c.style.opacity="1"));
+      document.addEventListener("mousedown", () => { c.classList.add("click"); setTimeout(()=>c.classList.remove("click"),400); });
+      document.addEventListener("mouseover", e => {
+        const t = e.target && e.target.closest && e.target.closest("a,button,.faq-item,.faq-q,.legal-tab");
+        c.classList.toggle("locked", !!t);
+      });
+    })();
+
+    const Store = window.KernelabStore;
+    const s = Store.getSettings();
+    const faq = s.faq || [];
+    const list = document.getElementById("faqList");
+    list.innerHTML = faq.map((item, i) => `
+      <div class="faq-item" data-i="${i}">
+        <button class="faq-q" type="button">
+          <span class="faq-num">${String(i+1).padStart(2,"0")}</span>
+          <span class="faq-q-text">${item.q.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>
+          <span class="faq-arrow">›</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">${(item.a || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>")}</div></div>
+      </div>
+    `).join("") || `<p class="ape-hint" style="text-align:center">No questions configured yet.</p>`;
+    document.querySelectorAll(".faq-q").forEach(b => b.addEventListener("click", () => b.parentElement.classList.toggle("open")));
+
+    // Footer links
+    const fl = document.getElementById("footerLinks");
+    const social = s.social || {}, legal = s.legal || {};
+    const items = [];
+    if (legal.faqUrl)    items.push(`<a href="${legal.faqUrl}">FAQ</a>`);
+    if (legal.termsUrl)  items.push(`<a href="${legal.termsUrl}">TERMS</a>`);
+    if (legal.privacyUrl && legal.privacyUrl !== legal.termsUrl) items.push(`<a href="${legal.privacyUrl}">PRIVACY</a>`);
+    if (social.discord)  items.push(`<a href="${social.discord}" target="_blank" rel="noopener">DISCORD</a>`);
+    if (social.telegram) items.push(`<a href="${social.telegram}" target="_blank" rel="noopener">TELEGRAM</a>`);
+    fl.innerHTML = items.join('<span class="fl-sep">·</span>');
+  </script>
+</body>
+</html>
