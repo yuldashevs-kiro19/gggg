@@ -1,5 +1,5 @@
 {
-  "version": 1781385101455,
+  "version": 1781385427467,
   "products": [
     {
       "id": "KAB-001",
@@ -126,7 +126,7 @@
           "dur": "1 day",
           "price": 4.99,
           "links": {
-            "ru": "",
+            "ru": "https://oplata.info/asp2/pay_wm.asp?id_d=5939150&lang=ru-RU",
             "eu": "",
             "ltc": "",
             "btc": ""
@@ -136,7 +136,7 @@
           "dur": "7 days",
           "price": 24.99,
           "links": {
-            "ru": "",
+            "ru": "https://oplata.info/asp2/pay_wm.asp?id_d=5939762&lang=ru-RU",
             "eu": "",
             "ltc": "",
             "btc": ""
@@ -146,7 +146,7 @@
           "dur": "30 days",
           "price": 49.99,
           "links": {
-            "ru": "",
+            "ru": "https://oplata.info/asp2/pay_wm.asp?id_d=5939766&lang=ru-RU",
             "eu": "",
             "ltc": "",
             "btc": ""
@@ -157,6 +157,16 @@
           "price": 199.99,
           "links": {
             "ru": "",
+            "eu": "",
+            "ltc": "",
+            "btc": ""
+          }
+        },
+        {
+          "dur": "6 hours",
+          "price": 2.49,
+          "links": {
+            "ru": "https://oplata.info/asp2/pay_wm.asp?id_d=5939754&lang=ru-RU",
             "eu": "",
             "ltc": "",
             "btc": ""
