@@ -1,6 +1,85 @@
 {
-  "version": 1781377369102,
-  "products": [],
+  "version": 1781378378304,
+  "products": [
+    {
+      "id": "KAB-001",
+      "name": "asdas",
+      "short": "ASDAS",
+      "clear": "S",
+      "status": "NEW",
+      "base": 5,
+      "rating": 5,
+      "desc": "",
+      "tags": [],
+      "games": [],
+      "features": {
+        "aim": [],
+        "visual": [],
+        "misc": []
+      },
+      "req": {
+        "os": "Windows 10/11 x64",
+        "cpu": "—",
+        "ram": "—",
+        "driver": "—",
+        "net": "—"
+      },
+      "images": [],
+      "reviews": [],
+      "tiers": [
+        {
+          "dur": "1 day",
+          "price": 5,
+          "links": {
+            "ru": "",
+            "eu": "",
+            "ltc": "",
+            "btc": ""
+          }
+        },
+        {
+          "dur": "7 days",
+          "price": 23,
+          "links": {
+            "ru": "",
+            "eu": "",
+            "ltc": "",
+            "btc": ""
+          }
+        },
+        {
+          "dur": "30 days",
+          "price": 70,
+          "links": {
+            "ru": "",
+            "eu": "",
+            "ltc": "",
+            "btc": ""
+          }
+        },
+        {
+          "dur": "90 days",
+          "price": 160,
+          "links": {
+            "ru": "",
+            "eu": "",
+            "ltc": "",
+            "btc": ""
+          }
+        },
+        {
+          "dur": "Lifetime",
+          "price": 400,
+          "links": {
+            "ru": "",
+            "eu": "",
+            "ltc": "",
+            "btc": ""
+          }
+        }
+      ]
+    }
+  ],
   "games": [
     {
       "key": "cs2",
