@@ -500,27 +500,52 @@ Last updated: 2026-06-01
   ];
 
   function makePrices(productOrBase) {
-    const p = (typeof productOrBase === "number" || productOrBase == null)
-      ? { base: Number(productOrBase) || 0 }
-      : productOrBase;
+    // If a number is passed (legacy), build mock tiers from base × multiplier.
+    if (typeof productOrBase === "number" || productOrBase == null) {
+      const base = Number(productOrBase) || 0;
+      return TIERS.map((t, i) => {
+        const price = base > 0 ? Math.round(base * t.mult) : 0;
+        const saving = (i === 0 || price <= 0)
+          ? 0
+          : Math.max(0, Math.min(Math.round((1 - price / (base * (i+1))) * 100) + 5, 65));
+        return { dur: t.dur, price, saving, links: {} };
+      });
+    }
+    const p = productOrBase;
+    // Preferred: explicit `tiers` array on the product (new schema).
+    if (Array.isArray(p.tiers) && p.tiers.length) {
+      return p.tiers.map((t, i, arr) => {
+        const price = Number(t.price) || 0;
+        // Compute saving relative to first non-zero tier × index — informational only.
+        const first = arr.find(x => Number(x.price) > 0);
+        const baseEq = first ? Number(first.price) : 0;
+        const saving = (i === 0 || price <= 0 || baseEq <= 0)
+          ? 0
+          : Math.max(0, Math.min(Math.round((1 - price / (baseEq * (i+1))) * 100) + 5, 65));
+        return {
+          dur: t.dur || "",
+          price,
+          saving,
+          links: t.links || {},
+        };
+      });
+    }
+    // Fallback: old schema with base + prices override.
     const explicit = p.prices || {};
     const base = Number(p.base) || 0;
     return TIERS.map((t, i) => {
       const v = explicit[t.dur];
       let price;
-      if (v !== undefined && v !== "" && v !== null) {
-        // Explicit value (could be 0 — tier hidden)
-        price = Number(v) || 0;
-      } else if (base > 0) {
-        // Auto-computed from base × multiplier
-        price = Math.round(base * t.mult);
-      } else {
-        price = 0;
-      }
+      if (v !== undefined && v !== "" && v !== null) price = Number(v) || 0;
+      else if (base > 0) price = Math.round(base * t.mult);
+      else price = 0;
       const saving = (i === 0 || price <= 0 || base <= 0)
         ? 0
         : Math.max(0, Math.min(Math.round((1 - price / (base * (i+1))) * 100) + 5, 65));
-      return { dur: t.dur, price, saving };
+      // Migrate single-link buyLinks → eu method
+      const oldLink = p.buyLinks && p.buyLinks[t.dur];
+      const links = oldLink ? { eu: oldLink } : {};
+      return { dur: t.dur, price, saving, links };
     });
   }
 
@@ -1287,9 +1312,9 @@ function openProductEditor(id) {
           </select>
         </div>
         <div>
-          <label class="ape-label">BASE PRICE (USD per day · auto-fill)</label>
+          <label class="ape-label">BASE PRICE (USD/day · legacy auto-fill, optional)</label>
           <input class="ape-input" id="fBase" type="number" step="0.5" min="0" value="${p.base}"/>
-          <div class="ape-tier-preview" id="fTierPreview"></div>
+          <span class="ape-hint">Used only if you don't define explicit tiers below.</span>
         </div>
         <div>
           <label class="ape-label">RATING (0-5)</label>
@@ -1297,16 +1322,10 @@ function openProductEditor(id) {
         </div>
 
         <div class="ape-full">
-          <label class="ape-label">PRICES · PER TIER (USD)</label>
-          <p class="ape-hint">Set explicit price per duration. Leave empty → auto-compute from base × multiplier. Set <code>0</code> → tier hidden from customers.</p>
-          <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px">
-            ${Store.TIERS.map(t => `
-              <div>
-                <label class="ape-label" style="text-align:center">${t.dur.toUpperCase()}</label>
-                <input class="ape-input" data-tier-price="${escapeHtml(t.dur)}" type="number" min="0" step="0.5" placeholder="auto" value="${(p.prices && p.prices[t.dur] !== undefined) ? p.prices[t.dur] : ""}" style="text-align:center"/>
-              </div>
-            `).join("")}
-          </div>
+          <label class="ape-label">PRICING TIERS</label>
+          <p class="ape-hint">Each tier has its own duration label, price and per-method payment links. Add as many as you want — <code>6 hours</code>, <code>1 day</code>, <code>Lifetime</code>, anything. Tiers with empty label or price ≤ 0 are not saved.</p>
+          <div class="tiers-list" id="tiersList"></div>
+          <button class="btn btn-ghost btn-sm" id="tiersAdd" type="button" style="margin-top:10px">+ ADD TIER</button>
         </div>
         <div class="ape-full">
           <label class="ape-label">DESCRIPTION</label>
@@ -1343,17 +1362,6 @@ function openProductEditor(id) {
         <div><label class="ape-label">REQ · NETWORK</label><input class="ape-input" id="fReqNet" value="${escapeHtml(p.req?.net||"")}"/></div>
 
         <div class="ape-full">
-          <label class="ape-label">PAYMENT LINKS · PER TIER</label>
-          <p class="ape-hint">Direct checkout URL per duration. Leave empty to fall back to <code>Settings → Payment Links</code> templates.</p>
-          ${Store.TIERS.map((t, i) => `
-            <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;margin-bottom:6px">
-              <label class="ape-label" style="margin:0;color:var(--accent-soft)">${t.dur.toUpperCase()}</label>
-              <input class="ape-input" data-tier-link="${escapeHtml(t.dur)}" placeholder="https://buy.example.com/..." value="${escapeHtml((p.buyLinks && p.buyLinks[t.dur]) || "")}"/>
-            </div>
-          `).join("")}
-        </div>
-
-        <div class="ape-full">
           <label class="ape-label">IMAGES</label>
           <div class="ape-images" id="fImages"></div>
           <input type="file" id="fImageFile" accept="image/*" multiple style="display:none"/>
@@ -1371,24 +1379,67 @@ function openProductEditor(id) {
   document.body.appendChild(editor);
   document.body.style.overflow = "hidden";
 
-  // Tier preview
-  function refreshTierPreview() {
-    const base = Number($("#fBase", editor).value) || 0;
-    const explicit = {};
-    $$("[data-tier-price]", editor).forEach(inp => {
-      const v = inp.value.trim();
-      if (v !== "") explicit[inp.dataset.tierPrice] = Number(v);
-    });
-    const tiers = Store.makePrices({ base, prices: explicit });
-    $("#fTierPreview", editor).innerHTML = tiers
-      .map(t => t.price > 0
-        ? `<span><b>${t.dur}</b> $${t.price}</span>`
-        : `<span style="opacity:.4;text-decoration:line-through"><b>${t.dur}</b> hidden</span>`)
-      .join(" · ");
+  // Tier preview — replaced by dynamic tiers editor below
+  // (Old refreshTierPreview removed; tiers section is now self-managed)
+
+  // ----- Dynamic pricing tiers (per-product, per-method links) -----
+  // Initialise from existing tiers, or migrate from legacy base/prices/buyLinks
+  let productTiers = [];
+  if (Array.isArray(p.tiers) && p.tiers.length) {
+    productTiers = JSON.parse(JSON.stringify(p.tiers));
+  } else if (p.prices || p.buyLinks || p.base) {
+    // One-time legacy migration in the editor
+    const computed = Store.makePrices(p);
+    productTiers = computed.filter(t => t.price > 0).map(t => ({
+      dur: t.dur,
+      price: t.price,
+      links: { ...(t.links || {}) },
+    }));
   }
-  refreshTierPreview();
-  $("#fBase", editor).addEventListener("input", refreshTierPreview);
-  $$("[data-tier-price]", editor).forEach(inp => inp.addEventListener("input", refreshTierPreview));
+  if (!productTiers.length) {
+    productTiers = [{ dur: "", price: 0, links: {} }];
+  }
+  function paintTiers() {
+    const list = $("#tiersList", editor);
+    if (!list) return;
+    list.innerHTML = productTiers.map((t, i) => `
+      <div class="tier-row" data-i="${i}">
+        <div class="tier-row-head">
+          <span class="tier-row-num">${String(i+1).padStart(2,"0")}</span>
+          <input class="ape-input" data-tf="dur" placeholder="e.g. 6 hours, 1 day, Lifetime" value="${escapeHtml(t.dur||"")}"/>
+          <span class="tier-row-currency">$</span>
+          <input class="ape-input" data-tf="price" type="number" step="0.01" min="0" placeholder="0" value="${t.price||0}" style="max-width:110px;text-align:center"/>
+          <button class="btn-sm danger" data-tier-rm="${i}" type="button" title="Remove tier">×</button>
+        </div>
+        <div class="tier-row-links">
+          <div><label class="ape-label">RU CARDS</label><input class="ape-input" data-tf="ru" placeholder="https://buy.example.com/ru/..." value="${escapeHtml((t.links&&t.links.ru)||"")}"/></div>
+          <div><label class="ape-label">EU/US CARDS</label><input class="ape-input" data-tf="eu" placeholder="https://buy.example.com/eu/..." value="${escapeHtml((t.links&&t.links.eu)||"")}"/></div>
+          <div><label class="ape-label">CRYPTO · LTC</label><input class="ape-input" data-tf="ltc" placeholder="https://buy.example.com/ltc/..." value="${escapeHtml((t.links&&t.links.ltc)||"")}"/></div>
+          <div><label class="ape-label">CRYPTO · BTC</label><input class="ape-input" data-tf="btc" placeholder="https://buy.example.com/btc/..." value="${escapeHtml((t.links&&t.links.btc)||"")}"/></div>
+        </div>
+      </div>
+    `).join("");
+    // Wire row inputs
+    $$(".tier-row input", editor).forEach(inp => inp.addEventListener("input", e => {
+      const row = e.target.closest(".tier-row");
+      const i = Number(row.dataset.i);
+      const f = e.target.dataset.tf;
+      if (!productTiers[i]) return;
+      if (f === "dur")        productTiers[i].dur = e.target.value;
+      else if (f === "price") productTiers[i].price = Number(e.target.value) || 0;
+      else { productTiers[i].links = productTiers[i].links || {}; productTiers[i].links[f] = e.target.value.trim(); }
+    }));
+    $$("[data-tier-rm]", editor).forEach(b => b.addEventListener("click", () => {
+      productTiers.splice(Number(b.dataset.tierRm), 1);
+      if (!productTiers.length) productTiers.push({ dur: "", price: 0, links: {} });
+      paintTiers();
+    }));
+  }
+  paintTiers();
+  $("#tiersAdd", editor).addEventListener("click", () => {
+    productTiers.push({ dur: "", price: 0, links: {} });
+    paintTiers();
+  });
 
   // Images
   let images = [...(p.images || [])];
@@ -1443,22 +1494,18 @@ function openProductEditor(id) {
       },
       images,
       reviews: p.reviews || [],
-      prices: (function() {
-        const out = {};
-        $$("[data-tier-price]", editor).forEach(inp => {
-          const v = inp.value.trim();
-          if (v !== "") out[inp.dataset.tierPrice] = Number(v);
-        });
-        return out;
-      })(),
-      buyLinks: (function() {
-        const links = {};
-        $$("[data-tier-link]", editor).forEach(inp => {
-          const v = inp.value.trim();
-          if (v) links[inp.dataset.tierLink] = v;
-        });
-        return links;
-      })(),
+      tiers: productTiers
+        .map(t => ({
+          dur: (t.dur || "").trim(),
+          price: Number(t.price) || 0,
+          links: {
+            ru:  ((t.links && t.links.ru)  || "").trim(),
+            eu:  ((t.links && t.links.eu)  || "").trim(),
+            ltc: ((t.links && t.links.ltc) || "").trim(),
+            btc: ((t.links && t.links.btc) || "").trim(),
+          },
+        }))
+        .filter(t => t.dur && t.price > 0),
     };
     if (!newP.name) { showToast("Name is required", "ERROR", "err"); return; }
     if (!newP.short) newP.short = newP.name.split(/\s+/)[0].toUpperCase();

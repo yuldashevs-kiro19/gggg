@@ -356,27 +356,52 @@ Last updated: 2026-06-01
   ];
 
   function makePrices(productOrBase) {
-    const p = (typeof productOrBase === "number" || productOrBase == null)
-      ? { base: Number(productOrBase) || 0 }
-      : productOrBase;
+    // If a number is passed (legacy), build mock tiers from base × multiplier.
+    if (typeof productOrBase === "number" || productOrBase == null) {
+      const base = Number(productOrBase) || 0;
+      return TIERS.map((t, i) => {
+        const price = base > 0 ? Math.round(base * t.mult) : 0;
+        const saving = (i === 0 || price <= 0)
+          ? 0
+          : Math.max(0, Math.min(Math.round((1 - price / (base * (i+1))) * 100) + 5, 65));
+        return { dur: t.dur, price, saving, links: {} };
+      });
+    }
+    const p = productOrBase;
+    // Preferred: explicit `tiers` array on the product (new schema).
+    if (Array.isArray(p.tiers) && p.tiers.length) {
+      return p.tiers.map((t, i, arr) => {
+        const price = Number(t.price) || 0;
+        // Compute saving relative to first non-zero tier × index — informational only.
+        const first = arr.find(x => Number(x.price) > 0);
+        const baseEq = first ? Number(first.price) : 0;
+        const saving = (i === 0 || price <= 0 || baseEq <= 0)
+          ? 0
+          : Math.max(0, Math.min(Math.round((1 - price / (baseEq * (i+1))) * 100) + 5, 65));
+        return {
+          dur: t.dur || "",
+          price,
+          saving,
+          links: t.links || {},
+        };
+      });
+    }
+    // Fallback: old schema with base + prices override.
     const explicit = p.prices || {};
     const base = Number(p.base) || 0;
     return TIERS.map((t, i) => {
       const v = explicit[t.dur];
       let price;
-      if (v !== undefined && v !== "" && v !== null) {
-        // Explicit value (could be 0 — tier hidden)
-        price = Number(v) || 0;
-      } else if (base > 0) {
-        // Auto-computed from base × multiplier
-        price = Math.round(base * t.mult);
-      } else {
-        price = 0;
-      }
+      if (v !== undefined && v !== "" && v !== null) price = Number(v) || 0;
+      else if (base > 0) price = Math.round(base * t.mult);
+      else price = 0;
       const saving = (i === 0 || price <= 0 || base <= 0)
         ? 0
         : Math.max(0, Math.min(Math.round((1 - price / (base * (i+1))) * 100) + 5, 65));
-      return { dur: t.dur, price, saving };
+      // Migrate single-link buyLinks → eu method
+      const oldLink = p.buyLinks && p.buyLinks[t.dur];
+      const links = oldLink ? { eu: oldLink } : {};
+      return { dur: t.dur, price, saving, links };
     });
   }
 

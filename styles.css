@@ -1969,3 +1969,36 @@ body.maintenance-on > *:not(.maintenance):not(.bg-base):not(.bg-glow):not(.bg-vi
   .legal-modal-head h2 { font-size: 22px; }
   .legal-modal-body { max-height: 70vh; }
 }
+
+
+/* ===== Admin: dynamic pricing tier rows ===== */
+.tiers-list { display: flex; flex-direction: column; gap: 10px; }
+.tier-row {
+  padding: 14px; border-radius: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--panel-line);
+}
+.tier-row-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.tier-row-num {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+  color: var(--accent); padding: 4px 8px;
+  border: 1px solid var(--accent-dim); border-radius: 4px; flex-shrink: 0;
+}
+.tier-row-head .ape-input { flex: 1; min-width: 0; }
+.tier-row-currency {
+  font-family: "Orbitron"; font-weight: 900; font-size: 18px;
+  color: var(--accent); padding: 0 4px;
+}
+.tier-row-links {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px;
+}
+.tier-row-links .ape-label {
+  margin-bottom: 4px; color: var(--accent-soft); font-weight: 700;
+}
+.tier-row-links .ape-input { font-size: 12px; }
+
+@media (max-width: 700px) {
+  .tier-row-links { grid-template-columns: 1fr; }
+  .tier-row-head { flex-wrap: wrap; }
+}

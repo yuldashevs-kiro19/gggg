@@ -937,6 +937,19 @@ function openPayment(product, tier) {
   payPromo.value = "";
   promoStatus.textContent = "";
   promoStatus.className = "promo-status";
+
+  // Show only payment methods configured for this tier (or fall back to global if tier has none)
+  const settings = Store.getSettings();
+  const tierLinks = (tier && tier.links) || {};
+  const ALL = ["ru","eu","ltc","btc"];
+  const tierConfigured = ALL.filter(m => tierLinks[m] && tierLinks[m].trim());
+  const visible = tierConfigured.length
+    ? tierConfigured
+    : ALL.filter(m => settings.paymentLinks && settings.paymentLinks[m] && settings.paymentLinks[m].trim());
+  document.querySelectorAll(".pay-method").forEach(btn => {
+    btn.style.display = visible.includes(btn.dataset.method) ? "" : "none";
+  });
+
   paymentModal.classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -1001,10 +1014,10 @@ document.querySelectorAll(".pay-method").forEach(btn => {
     };
     try { Store.pushOrder(order); } catch (e) {}
     showToast(`Order ${order.id} created · <b>${method.toUpperCase()}</b>`, "PAY");
-    // Per-product/per-tier override → falls back to global template if empty
+    // Per-tier per-method link → fall back to global template
     const settings = Store.getSettings();
-    const productLink = currentPay.product.buyLinks && currentPay.product.buyLinks[currentPay.tier.dur];
-    const tmpl = productLink || (settings.paymentLinks && settings.paymentLinks[method]) || "";
+    const tierLink = currentPay.tier && currentPay.tier.links && currentPay.tier.links[method];
+    const tmpl = tierLink || (settings.paymentLinks && settings.paymentLinks[method]) || "";
     if (tmpl) {
       const url = tmpl
         .replace("{id}", encodeURIComponent(currentPay.product.id))
@@ -1013,6 +1026,8 @@ document.querySelectorAll(".pay-method").forEach(btn => {
         .replace("{email}", encodeURIComponent(email))
         .replace("{order}", encodeURIComponent(order.id));
       window.open(url, "_blank", "noopener");
+    } else {
+      showToast("No payment URL configured for this method/tier", "WARN");
     }
     // Brief success animation then close
     btn.classList.add("clicked");
