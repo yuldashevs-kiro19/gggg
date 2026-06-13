@@ -356,6 +356,21 @@ function renderDashboard(root) {
       <div class="kpi"><div class="kpi-label">CLICKS · CONVERSION</div><div class="kpi-val">${clicks.length}</div><div class="kpi-sub">${conversion}% conversion</div></div>
     </div>
 
+    <div class="ap-card">
+      <div class="ap-head">
+        <span class="kicker">// LIVE TRAFFIC · GLOBAL</span>
+        <span class="ap-head-side">via counterapi.dev · cross-browser</span>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">VISITS · TODAY</div><div class="kpi-val" id="liveTodayVisits">…</div><div class="kpi-sub">unique sessions across all browsers</div></div>
+        <div class="kpi"><div class="kpi-label">VISITS · ALL TIME</div><div class="kpi-val" id="liveTotalVisits">…</div><div class="kpi-sub">since site launch</div></div>
+        <div class="kpi"><div class="kpi-label">CLICKS · ALL TIME</div><div class="kpi-val" id="liveTotalClicks">…</div><div class="kpi-sub">product modal opens</div></div>
+        <div class="kpi"><div class="kpi-label">CONVERSION · LIVE</div><div class="kpi-val" id="liveConv">…</div><div class="kpi-sub">orders / visits</div></div>
+      </div>
+      <div class="ap-head" style="margin-top:18px"><span class="kicker">// CLICKS PER PRODUCT (GLOBAL)</span></div>
+      <svg class="ap-chart" id="liveBar" style="height:240px"></svg>
+    </div>
+
     <div class="ap-grid two">
       <div class="ap-card">
         <div class="ap-head"><span class="kicker">// REVENUE · LAST 14 DAYS</span><span class="ap-head-side">${fmtMoney(days.reduce((s,d)=>s+d.v,0))} total</span></div>
@@ -408,6 +423,39 @@ function renderDashboard(root) {
   barChart($("#dashBar"), top);
   donutChart($("#dashDonut"), methodData, { label: "ORDERS" });
   $$(".ap-head-link").forEach(a => a.addEventListener("click", () => navigate(a.dataset.link)));
+
+  // Async: pull live cross-browser stats from counterapi.dev
+  (async () => {
+    try {
+      if (!Store.Analytics) return;
+      const stats = await Store.Analytics.getStats(products);
+      const elTotal = document.getElementById("liveTotalVisits");
+      const elToday = document.getElementById("liveTodayVisits");
+      const elClicks = document.getElementById("liveTotalClicks");
+      const elConv  = document.getElementById("liveConv");
+      if (elTotal) elTotal.textContent = stats.totalVisits.toLocaleString("en-US");
+      if (elToday) elToday.textContent = stats.todayVisits.toLocaleString("en-US");
+      if (elClicks) elClicks.textContent = stats.totalClicks.toLocaleString("en-US");
+      if (elConv)  elConv.textContent = stats.totalVisits ? ((orders.length / stats.totalVisits) * 100).toFixed(1) + "%" : "0%";
+
+      // Live bar chart per product
+      const liveBarData = products
+        .map(p => ({
+          id: p.id,
+          label: p.name,
+          v: stats.productClicks[p.id] || 0,
+          label2: (stats.productClicks[p.id] || 0).toString(),
+        }))
+        .sort((a, b) => b.v - a.v)
+        .slice(0, 10);
+      const liveBar = document.getElementById("liveBar");
+      if (liveBar) barChart(liveBar, liveBarData);
+    } catch (e) {
+      console.error("[dashboard] live stats failed:", e);
+      const elTotal = document.getElementById("liveTotalVisits");
+      if (elTotal) elTotal.textContent = "—";
+    }
+  })();
 }
 
 /* ===================================================================== *

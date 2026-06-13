@@ -464,9 +464,73 @@ Last updated: 2026-06-01
     };
   })();
 
+  /* ===== Real-time analytics via counterapi.dev (free public counter) ===== */
+  const Analytics = (function () {
+    const BASE = "https://api.counterapi.dev/v2";
+    const NS = "kernelab";
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function todayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    async function bump(key) {
+      try {
+        const r = await fetch(`${BASE}/${NS}/${encodeURIComponent(key)}/up`, { cache: "no-store" });
+        if (!r.ok) return null;
+        const j = await r.json();
+        return (j && (j.data ? j.data.up_count : j.count)) || null;
+      } catch (e) { return null; }
+    }
+    async function read(key) {
+      try {
+        const r = await fetch(`${BASE}/${NS}/${encodeURIComponent(key)}`, { cache: "no-store" });
+        if (!r.ok) return 0;
+        const j = await r.json();
+        return (j && (j.data ? j.data.up_count : j.count)) || 0;
+      } catch (e) { return 0; }
+    }
+    return {
+      // Increment site-wide visit (once per browser session)
+      visitOnce() {
+        try {
+          if (sessionStorage.getItem("kab_visit_logged")) return;
+          sessionStorage.setItem("kab_visit_logged", "1");
+        } catch (e) {}
+        bump("visits-total");
+        bump("visits-" + todayKey());
+      },
+      // Increment product click counter
+      click(productId) {
+        if (!productId) return;
+        bump("clicks-total");
+        bump("clicks-" + productId);
+      },
+      // Pull current stats for admin dashboard
+      async getStats(products) {
+        const out = {
+          totalVisits: 0,
+          todayVisits: 0,
+          totalClicks: 0,
+          productClicks: {},
+        };
+        try {
+          out.totalVisits = await read("visits-total");
+          out.todayVisits = await read("visits-" + todayKey());
+          out.totalClicks = await read("clicks-total");
+          if (products && products.length) {
+            await Promise.all(products.map(async p => {
+              out.productClicks[p.id] = await read("clicks-" + p.id);
+            }));
+          }
+        } catch (e) { console.error("[analytics] stats failed:", e); }
+        return out;
+      },
+    };
+  })();
+
   /* ===== Public API ===== */
   const Store = {
-    KEYS, TIERS, STATUSES, Media,
+    KEYS, TIERS, STATUSES, Media, Analytics,
 
     /* products */
     getProducts() { return readJSON(KEYS.products, DEFAULT_PRODUCTS); },

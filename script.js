@@ -9,6 +9,9 @@ const Store = window.KernelabStore;
 // If the file doesn't exist yet, falls through to local defaults.
 try { Store.syncFromServerSync(); } catch (e) {}
 
+// Real-time analytics — increments shared counter (once per browser session)
+try { Store.Analytics && Store.Analytics.visitOnce(); } catch (e) {}
+
 /* ===== 0. Maintenance gate — short-circuit everything ===== */
 const __settings = Store.getSettings();
 if (__settings.maintenance && __settings.maintenance.enabled) {
@@ -646,8 +649,9 @@ let activeTierIdx = 2;
 function openProduct(id) {
   const m = modules.find(x => x.id === id);
   if (!m) return;
-  // Track click for analytics
+  // Track click for analytics — local + global
   try { Store.pushClick(id); } catch (e) {}
+  try { Store.Analytics && Store.Analytics.click(id); } catch (e) {}
 
   pmName.textContent = m.name;
   pmId.textContent   = `DOSSIER · ${m.id} · CLEARANCE ${m.clear}`;

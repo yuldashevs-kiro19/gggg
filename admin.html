@@ -609,9 +609,73 @@ Last updated: 2026-06-01
     };
   })();
 
+  /* ===== Real-time analytics via counterapi.dev (free public counter) ===== */
+  const Analytics = (function () {
+    const BASE = "https://api.counterapi.dev/v2";
+    const NS = "kernelab";
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function todayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    async function bump(key) {
+      try {
+        const r = await fetch(`${BASE}/${NS}/${encodeURIComponent(key)}/up`, { cache: "no-store" });
+        if (!r.ok) return null;
+        const j = await r.json();
+        return (j && (j.data ? j.data.up_count : j.count)) || null;
+      } catch (e) { return null; }
+    }
+    async function read(key) {
+      try {
+        const r = await fetch(`${BASE}/${NS}/${encodeURIComponent(key)}`, { cache: "no-store" });
+        if (!r.ok) return 0;
+        const j = await r.json();
+        return (j && (j.data ? j.data.up_count : j.count)) || 0;
+      } catch (e) { return 0; }
+    }
+    return {
+      // Increment site-wide visit (once per browser session)
+      visitOnce() {
+        try {
+          if (sessionStorage.getItem("kab_visit_logged")) return;
+          sessionStorage.setItem("kab_visit_logged", "1");
+        } catch (e) {}
+        bump("visits-total");
+        bump("visits-" + todayKey());
+      },
+      // Increment product click counter
+      click(productId) {
+        if (!productId) return;
+        bump("clicks-total");
+        bump("clicks-" + productId);
+      },
+      // Pull current stats for admin dashboard
+      async getStats(products) {
+        const out = {
+          totalVisits: 0,
+          todayVisits: 0,
+          totalClicks: 0,
+          productClicks: {},
+        };
+        try {
+          out.totalVisits = await read("visits-total");
+          out.todayVisits = await read("visits-" + todayKey());
+          out.totalClicks = await read("clicks-total");
+          if (products && products.length) {
+            await Promise.all(products.map(async p => {
+              out.productClicks[p.id] = await read("clicks-" + p.id);
+            }));
+          }
+        } catch (e) { console.error("[analytics] stats failed:", e); }
+        return out;
+      },
+    };
+  })();
+
   /* ===== Public API ===== */
   const Store = {
-    KEYS, TIERS, STATUSES, Media,
+    KEYS, TIERS, STATUSES, Media, Analytics,
 
     /* products */
     getProducts() { return readJSON(KEYS.products, DEFAULT_PRODUCTS); },
@@ -1139,6 +1203,21 @@ function renderDashboard(root) {
       <div class="kpi"><div class="kpi-label">CLICKS · CONVERSION</div><div class="kpi-val">${clicks.length}</div><div class="kpi-sub">${conversion}% conversion</div></div>
     </div>
 
+    <div class="ap-card">
+      <div class="ap-head">
+        <span class="kicker">// LIVE TRAFFIC · GLOBAL</span>
+        <span class="ap-head-side">via counterapi.dev · cross-browser</span>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">VISITS · TODAY</div><div class="kpi-val" id="liveTodayVisits">…</div><div class="kpi-sub">unique sessions across all browsers</div></div>
+        <div class="kpi"><div class="kpi-label">VISITS · ALL TIME</div><div class="kpi-val" id="liveTotalVisits">…</div><div class="kpi-sub">since site launch</div></div>
+        <div class="kpi"><div class="kpi-label">CLICKS · ALL TIME</div><div class="kpi-val" id="liveTotalClicks">…</div><div class="kpi-sub">product modal opens</div></div>
+        <div class="kpi"><div class="kpi-label">CONVERSION · LIVE</div><div class="kpi-val" id="liveConv">…</div><div class="kpi-sub">orders / visits</div></div>
+      </div>
+      <div class="ap-head" style="margin-top:18px"><span class="kicker">// CLICKS PER PRODUCT (GLOBAL)</span></div>
+      <svg class="ap-chart" id="liveBar" style="height:240px"></svg>
+    </div>
+
     <div class="ap-grid two">
       <div class="ap-card">
         <div class="ap-head"><span class="kicker">// REVENUE · LAST 14 DAYS</span><span class="ap-head-side">${fmtMoney(days.reduce((s,d)=>s+d.v,0))} total</span></div>
@@ -1191,6 +1270,39 @@ function renderDashboard(root) {
   barChart($("#dashBar"), top);
   donutChart($("#dashDonut"), methodData, { label: "ORDERS" });
   $$(".ap-head-link").forEach(a => a.addEventListener("click", () => navigate(a.dataset.link)));
+
+  // Async: pull live cross-browser stats from counterapi.dev
+  (async () => {
+    try {
+      if (!Store.Analytics) return;
+      const stats = await Store.Analytics.getStats(products);
+      const elTotal = document.getElementById("liveTotalVisits");
+      const elToday = document.getElementById("liveTodayVisits");
+      const elClicks = document.getElementById("liveTotalClicks");
+      const elConv  = document.getElementById("liveConv");
+      if (elTotal) elTotal.textContent = stats.totalVisits.toLocaleString("en-US");
+      if (elToday) elToday.textContent = stats.todayVisits.toLocaleString("en-US");
+      if (elClicks) elClicks.textContent = stats.totalClicks.toLocaleString("en-US");
+      if (elConv)  elConv.textContent = stats.totalVisits ? ((orders.length / stats.totalVisits) * 100).toFixed(1) + "%" : "0%";
+
+      // Live bar chart per product
+      const liveBarData = products
+        .map(p => ({
+          id: p.id,
+          label: p.name,
+          v: stats.productClicks[p.id] || 0,
+          label2: (stats.productClicks[p.id] || 0).toString(),
+        }))
+        .sort((a, b) => b.v - a.v)
+        .slice(0, 10);
+      const liveBar = document.getElementById("liveBar");
+      if (liveBar) barChart(liveBar, liveBarData);
+    } catch (e) {
+      console.error("[dashboard] live stats failed:", e);
+      const elTotal = document.getElementById("liveTotalVisits");
+      if (elTotal) elTotal.textContent = "—";
+    }
+  })();
 }
 
 /* ===================================================================== *
