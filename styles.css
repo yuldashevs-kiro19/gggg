@@ -2002,3 +2002,34 @@ body.maintenance-on > *:not(.maintenance):not(.bg-base):not(.bg-glow):not(.bg-vi
   .tier-row-links { grid-template-columns: 1fr; }
   .tier-row-head { flex-wrap: wrap; }
 }
+
+
+/* ===== Product badges (pins) ===== */
+.module-badges {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-bottom: 10px;
+}
+.module-badge {
+  position: relative;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.5px;
+  padding: 3px 9px; border-radius: 3px;
+  background: var(--accent); color: #000;
+  font-weight: 900; text-transform: uppercase;
+  box-shadow: 0 0 8px rgba(255,255,255,0.4);
+  white-space: nowrap;
+}
+.module-badge::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: #000; opacity: .35;
+}
+/* Variant styles per badge */
+.module-badge[data-b="POPULAR"]      { background: #fff; }
+.module-badge[data-b="BEST SELLER"]  { background: linear-gradient(135deg, #fff, #ddd); }
+.module-badge[data-b="SAFEST"]       { background: linear-gradient(135deg, #e8e8e8, #aaa); }
+.module-badge[data-b="HOT"]          { background: #fff; animation: badgePulse 1.4s ease-in-out infinite; }
+.module-badge[data-b="NEW"]          { background: #fff; }
+.module-badge[data-b="LIMITED"]      { background: linear-gradient(135deg, #ddd, #888); color: #fff; }
+@keyframes badgePulse {
+  0%,100% { box-shadow: 0 0 8px rgba(255,255,255,0.4); }
+  50%     { box-shadow: 0 0 18px rgba(255,255,255,0.9); }
+}

@@ -474,7 +474,8 @@ function renderProducts(root) {
   `;
   function paint(filter="") {
     const f = filter.trim().toLowerCase();
-    const filtered = !f ? products : products.filter(p => p.name.toLowerCase().includes(f) || p.id.toLowerCase().includes(f));
+    const sorted = [...products].sort((a,b) => (a.sort ?? 100) - (b.sort ?? 100) || (a.name||"").localeCompare(b.name||""));
+    const filtered = !f ? sorted : sorted.filter(p => p.name.toLowerCase().includes(f) || p.id.toLowerCase().includes(f));
     $("#prodGrid").innerHTML = filtered.map(p => {
       const allTiers = Store.makePrices(p);
       const visibleTiers = allTiers.filter(t => t.price > 0);
@@ -495,6 +496,7 @@ function renderProducts(root) {
             <span>${(p.reviews||[]).length} reviews</span>
             <span>${clickCount} clicks</span>
             <span>${visibleTiers.length}/${allTiers.length} tiers</span>
+            <span>sort: <b>${p.sort ?? 100}</b></span>
           </div>
           <div class="prod-actions">
             <button class="btn-sm" data-action="edit">EDIT</button>
@@ -532,6 +534,7 @@ function openProductEditor(id) {
   const p = id ? Store.getProduct(id) : {
     id: "KAB-" + String(Store.getProducts().length + 1).padStart(3, "0"),
     name: "", short: "", clear: "S", base: 5, status: "NEW", rating: 5.0,
+    sort: 100, badges: [],
     desc: "", tags: [], games: [],
     features: { aim: [], visual: [], misc: [] },
     req: { os: "Windows 10/11 x64", cpu: "—", ram: "—", driver: "—", net: "—" },
@@ -585,6 +588,19 @@ function openProductEditor(id) {
         <div>
           <label class="ape-label">RATING (0-5)</label>
           <input class="ape-input" id="fRating" type="number" step="0.1" min="0" max="5" value="${p.rating}"/>
+        </div>
+        <div>
+          <label class="ape-label">SORT ORDER (lower = first on the page)</label>
+          <input class="ape-input" id="fSort" type="number" step="1" value="${p.sort ?? 100}"/>
+          <span class="ape-hint">Default 100. Use 50 to push earlier, 150 to push later.</span>
+        </div>
+
+        <div class="ape-full">
+          <label class="ape-label">PINS · BADGES</label>
+          <p class="ape-hint">Tick badges to display them as pins on the product card.</p>
+          <div class="ape-chips" id="fBadges">
+            ${["POPULAR","BEST SELLER","SAFEST","HOT","NEW","LIMITED","UPDATED","EXCLUSIVE","TOP RATED","FAST DELIVERY"].map(b => `<label class="ape-chip"><input type="checkbox" value="${b}" ${(p.badges||[]).includes(b)?"checked":""}/> ${b}</label>`).join("")}
+          </div>
         </div>
 
         <div class="ape-full">
@@ -760,6 +776,8 @@ function openProductEditor(id) {
       },
       images,
       reviews: p.reviews || [],
+      badges: $$('#fBadges input:checked', editor).map(i => i.value),
+      sort:   Number($("#fSort", editor).value) || 100,
       tiers: productTiers
         .map(t => ({
           dur: (t.dur || "").trim(),

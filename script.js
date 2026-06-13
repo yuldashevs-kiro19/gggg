@@ -468,7 +468,9 @@ function renderModules(filter = "all") {
   currentFilter = filter;
   const filteredByGame = filter === "all" ? modules : modules.filter(m => m.games.includes(filter));
   // Hide products that have no purchasable tiers
-  const filtered = filteredByGame.filter(m => makePrices(m).some(t => t.price > 0));
+  const visible = filteredByGame.filter(m => makePrices(m).some(t => t.price > 0));
+  // Sort by admin-defined sort order, then name
+  const filtered = [...visible].sort((a,b) => (a.sort ?? 100) - (b.sort ?? 100) || (a.name||"").localeCompare(b.name||""));
   if (filter === "all") {
     loadoutFilterLabel.textContent = "All Games";
     loadoutClear.hidden = true;
@@ -507,6 +509,7 @@ function renderModules(filter = "all") {
             <span class="module-clear">CLEARANCE: ${m.clear}</span>
           </div>
           <div class="module-name">${m.name}</div>
+          ${m.badges && m.badges.length ? `<div class="module-badges">${m.badges.map(b => `<span class="module-badge" data-b="${b}">${b}</span>`).join("")}</div>` : ""}
           <div class="module-tags">${m.tags.map(t => `<span class="module-tag">${t}</span>`).join("")}</div>
           <div class="module-foot">
             <div class="module-price">
