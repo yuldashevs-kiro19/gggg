@@ -1067,45 +1067,90 @@ document.querySelectorAll(".pay-method").forEach(btn => {
   const fl = document.getElementById("footerLinks");
   if (fl) {
     const items = [];
-    if (legal.faqUrl)     items.push(`<a href="${legal.faqUrl}">FAQ</a>`);
-    if (legal.termsUrl)   items.push(`<a href="${legal.termsUrl}">TERMS</a>`);
-    if (legal.privacyUrl && legal.privacyUrl !== legal.termsUrl) items.push(`<a href="${legal.privacyUrl}">PRIVACY</a>`);
+    if (legal.faqUrl)     items.push(`<a href="#faq" data-legal="faq">FAQ</a>`);
+    if (legal.termsUrl)   items.push(`<a href="#terms" data-legal="terms">TERMS</a>`);
+    if (legal.privacyUrl && legal.privacyUrl !== legal.termsUrl) items.push(`<a href="#privacy" data-legal="privacy">PRIVACY</a>`);
     if (social.discord)   items.push(`<a href="${social.discord}" target="_blank" rel="noopener">DISCORD</a>`);
     if (social.telegram)  items.push(`<a href="${social.telegram}" target="_blank" rel="noopener">TELEGRAM</a>`);
     fl.innerHTML = items.join('<span class="fl-sep">·</span>');
+    fl.querySelectorAll("[data-legal]").forEach(a => a.addEventListener("click", e => {
+      e.preventDefault();
+      if (window.openLegalModal) window.openLegalModal(a.dataset.legal);
+    }));
   }
 })();
 
 
 /* ===================================================================== *
- * 13. FAQ + Terms + Privacy sections (rendered from settings)
+ * 13. Legal modal (FAQ / Terms / Privacy) — opens from footer links
  * ===================================================================== */
-(function renderLegalSections() {
-  const s = Store.getSettings();
+(function setupLegalModal() {
+  const modal = document.getElementById("legalModal");
+  if (!modal) return;
+  const titleEl  = document.getElementById("legalTitle");
+  const kickerEl = document.getElementById("legalKicker");
+  const bodyEl   = document.getElementById("legalBody");
+  const closeBtn = document.getElementById("legalClose");
+  const backdrop = modal.querySelector(".payment-backdrop");
 
-  // FAQ accordion
-  const faqEl = document.getElementById("faqListMain");
-  if (faqEl) {
+  function escHtml(t) { return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+  function fmtBlock(t) { return escHtml(t).replace(/\n\n/g,"</p><p>").replace(/\n/g,"<br>"); }
+
+  function renderFaq(s) {
     const faq = s.faq || [];
-    faqEl.innerHTML = faq.map((item, i) => `
-      <div class="faq-item" data-i="${i}">
-        <button class="faq-q" type="button">
-          <span class="faq-num">${String(i+1).padStart(2,"0")}</span>
-          <span class="faq-q-text">${(item.q || "").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>
-          <span class="faq-arrow">›</span>
-        </button>
-        <div class="faq-a"><div class="faq-a-inner">${(item.a || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>")}</div></div>
-      </div>
-    `).join("") || `<p class="ape-hint" style="text-align:center">No questions configured yet.</p>`;
-    faqEl.querySelectorAll(".faq-q").forEach(b => b.addEventListener("click", () => b.parentElement.classList.toggle("open")));
+    bodyEl.innerHTML = `<div class="faq-list">${
+      faq.map((item, i) => `
+        <div class="faq-item" data-i="${i}">
+          <button class="faq-q" type="button">
+            <span class="faq-num">${String(i+1).padStart(2,"0")}</span>
+            <span class="faq-q-text">${escHtml(item.q)}</span>
+            <span class="faq-arrow">›</span>
+          </button>
+          <div class="faq-a"><div class="faq-a-inner">${escHtml(item.a).replace(/\n/g,"<br>")}</div></div>
+        </div>
+      `).join("") || `<p class="ape-hint" style="text-align:center;padding:30px">No questions configured yet.</p>`
+    }</div>`;
+    bodyEl.querySelectorAll(".faq-q").forEach(b => b.addEventListener("click", () => b.parentElement.classList.toggle("open")));
   }
 
-  // Terms + Privacy text content
-  function fmtLegal(t) {
-    return String(t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n\n/g,"</p><p>").replace(/\n/g,"<br>");
+  window.openLegalModal = function (type) {
+    const s = Store.getSettings();
+    if (type === "faq") {
+      kickerEl.textContent = "// FREQUENTLY ASKED";
+      titleEl.textContent  = "FAQ";
+      renderFaq(s);
+    } else if (type === "terms") {
+      kickerEl.textContent = "// LEGAL · TERMS";
+      titleEl.textContent  = "Terms of Service";
+      bodyEl.innerHTML = `<article class="legal-content active"><p>${fmtBlock(s.terms)}</p></article>`;
+    } else if (type === "privacy") {
+      kickerEl.textContent = "// LEGAL · PRIVACY";
+      titleEl.textContent  = "Privacy Policy";
+      bodyEl.innerHTML = `<article class="legal-content active"><p>${fmtBlock(s.privacy)}</p></article>`;
+    } else { return; }
+    modal.classList.add("open");
+    document.body.style.overflow = "hidden";
+    bodyEl.scrollTop = 0;
+  };
+  function close() {
+    modal.classList.remove("open");
+    document.body.style.overflow = "";
   }
-  const termsEl = document.getElementById("legal-terms-main");
-  if (termsEl) termsEl.innerHTML = "<p>" + fmtLegal(s.terms) + "</p>";
-  const privEl = document.getElementById("legal-privacy-main");
-  if (privEl) privEl.innerHTML = "<p>" + fmtLegal(s.privacy) + "</p>";
+  closeBtn.addEventListener("click", close);
+  backdrop.addEventListener("click", close);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && modal.classList.contains("open")) close();
+  });
+
+  // Open via hash on initial load (e.g. /#faq)
+  function openFromHash() {
+    const h = (location.hash || "").replace("#", "");
+    if (h === "faq" || h === "terms" || h === "privacy") {
+      window.openLegalModal(h);
+      // strip hash so re-clicks fire properly
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+  }
+  openFromHash();
+  window.addEventListener("hashchange", openFromHash);
 })();

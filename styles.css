@@ -1930,3 +1930,42 @@ body.maintenance-on > *:not(.maintenance):not(.bg-base):not(.bg-glow):not(.bg-vi
   .faq-q { padding: 14px 16px; font-size: 14px; gap: 10px; }
   .faq-a-inner { padding: 0 16px 16px 16px; }
 }
+
+
+/* ===== Legal modal (FAQ / Terms / Privacy) ===== */
+.legal-modal {
+  position: fixed; inset: 0; z-index: 8200;
+  display: none; align-items: flex-start; justify-content: center;
+  padding: 30px 20px; overflow-y: auto;
+}
+.legal-modal.open { display: flex; animation: fadeIn .25s ease; }
+.legal-modal-panel {
+  position: relative; z-index: 1; width: 100%; max-width: 760px;
+  background: linear-gradient(160deg, rgba(14,14,14,0.97), rgba(4,4,4,0.97));
+  border: 1px solid var(--panel-line); border-radius: 14px;
+  box-shadow: var(--glow-strong), 0 30px 80px rgba(0,0,0,0.85);
+  padding: 28px; margin: auto;
+  animation: welcomePop .4s cubic-bezier(.2,.8,.2,1);
+}
+.legal-modal-head {
+  text-align: left; padding-bottom: 16px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--panel-line);
+}
+.legal-modal-head h2 {
+  font-family: "Orbitron"; font-weight: 900; font-size: 28px;
+  color: #eafff4; letter-spacing: 3px; margin-top: 6px;
+}
+.legal-modal-body { max-height: 65vh; overflow-y: auto; padding-right: 6px; }
+.legal-modal-body .legal-content {
+  display: block; padding: 20px 24px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--panel-line);
+  font-size: 14.5px; color: var(--text); line-height: 1.7; white-space: pre-wrap;
+}
+.legal-modal-body .legal-content p { margin-bottom: 14px; }
+.legal-modal-body .faq-list { margin: 0; }
+
+@media (max-width: 700px) {
+  .legal-modal-panel { padding: 22px 18px; }
+  .legal-modal-head h2 { font-size: 22px; }
+  .legal-modal-body { max-height: 70vh; }
+}
