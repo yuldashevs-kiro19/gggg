@@ -538,7 +538,7 @@ function openProductEditor(id) {
     desc: "", tags: [], games: [],
     features: { aim: [], visual: [], misc: [] },
     req: { os: "Windows 10/11 x64", cpu: "—", ram: "—", driver: "—", net: "—" },
-    images: [], reviews: [],
+    images: [], reviews: [], videoUrl: "",
   };
   const editor = document.createElement("div");
   editor.className = "ap-editor open";
@@ -642,6 +642,12 @@ function openProductEditor(id) {
         <div><label class="ape-label">REQ · RAM</label><input class="ape-input" id="fReqRam" value="${escapeHtml(p.req?.ram||"")}"/></div>
         <div><label class="ape-label">REQ · DRIVER</label><input class="ape-input" id="fReqDrv" value="${escapeHtml(p.req?.driver||"")}"/></div>
         <div><label class="ape-label">REQ · NETWORK</label><input class="ape-input" id="fReqNet" value="${escapeHtml(p.req?.net||"")}"/></div>
+
+        <div class="ape-full">
+          <label class="ape-label">VIDEO URL (optional, replaces image preview)</label>
+          <input class="ape-input" id="fVideoUrl" placeholder="https://example.com/clip.mp4" value="${escapeHtml(p.videoUrl||"")}"/>
+          <span class="ape-hint">If set, the card shows this video instead of the image (auto-play, muted, loop) and a red <code>▶ VIDEO</code> pin appears. Use direct <code>.mp4</code> / <code>.webm</code> URL — host on Catbox.moe, Streamable direct link, or your own server.</span>
+        </div>
 
         <div class="ape-full">
           <label class="ape-label">IMAGES</label>
@@ -775,6 +781,7 @@ function openProductEditor(id) {
         net: $("#fReqNet", editor).value.trim() || "—",
       },
       images,
+      videoUrl: $("#fVideoUrl", editor).value.trim(),
       reviews: p.reviews || [],
       badges: $$('#fBadges input:checked', editor).map(i => i.value),
       sort:   Number($("#fSort", editor).value) || 100,

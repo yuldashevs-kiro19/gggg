@@ -493,15 +493,23 @@ function renderModules(filter = "all") {
       coverUrl = (firstImg && firstImg.url) || (firstVid && firstVid.thumb) || "";
     }
     if (!coverUrl && Array.isArray(m.images) && m.images[0]) coverUrl = m.images[0];
-    const cover = coverUrl
-      ? `style="background-image: linear-gradient(135deg, rgba(10,10,10,0.55), rgba(0,0,0,0.4)), url('${coverUrl}'); background-size: cover; background-position: center;"`
-      : "";
+    const hasVideo = m.videoUrl && m.videoUrl.trim();
+    let coverHtml = "";
+    let coverStyle = "";
+    if (hasVideo) {
+      coverHtml = `<video class="module-video" src="${m.videoUrl}" autoplay muted loop playsinline preload="metadata"></video>`;
+    } else if (coverUrl) {
+      coverStyle = `style="background-image: linear-gradient(135deg, rgba(10,10,10,0.55), rgba(0,0,0,0.4)), url('${coverUrl}'); background-size: cover; background-position: center;"`;
+    }
+    // Auto-prepend VIDEO badge if videoUrl present
+    const badges = hasVideo ? ["VIDEO", ...(m.badges || [])] : (m.badges || []);
     return `
       <div class="module" data-id="${m.id}">
-        <div class="module-img" ${cover}>
+        <div class="module-img" ${coverStyle}>
+          ${coverHtml}
           <span class="module-status ${statusClass}"><span class="ms-dot"></span>${m.status}</span>
           <span class="module-rating">★ ${m.rating}</span>
-          ${coverUrl ? "" : `<span class="module-img-mark">${m.short}</span><div class="module-img-grid"></div>`}
+          ${(hasVideo || coverUrl) ? "" : `<span class="module-img-mark">${m.short}</span><div class="module-img-grid"></div>`}
         </div>
         <div class="module-content">
           <div class="module-row">
@@ -509,7 +517,7 @@ function renderModules(filter = "all") {
             <span class="module-clear">CLEARANCE: ${m.clear}</span>
           </div>
           <div class="module-name">${m.name}</div>
-          ${m.badges && m.badges.length ? `<div class="module-badges">${m.badges.map(b => `<span class="module-badge" data-b="${b}">${b}</span>`).join("")}</div>` : ""}
+          ${badges.length ? `<div class="module-badges">${badges.map(b => `<span class="module-badge" data-b="${b}">${b}</span>`).join("")}</div>` : ""}
           <div class="module-tags">${m.tags.map(t => `<span class="module-tag">${t}</span>`).join("")}</div>
           <div class="module-foot">
             <div class="module-price">
