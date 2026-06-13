@@ -1,5 +1,5 @@
 {
-  "version": 1781382537754,
+  "version": 1781382783140,
   "products": [
     {
       "id": "KAB-001",
@@ -11,7 +11,9 @@
       "rating": 5,
       "desc": "",
       "tags": [],
-      "games": [],
+      "games": [
+        "rust"
+      ],
       "features": {
         "aim": [],
         "visual": [],
@@ -87,10 +89,10 @@
   "games": [
     {
       "key": "rust",
-      "name": "Rust",
       "short": "RUST",
+      "name": "Rust",
       "ac": "EAC",
-      "status": "UNDETECTED"
+      "status": "POPULAR"
     }
   ],
   "settings": {
