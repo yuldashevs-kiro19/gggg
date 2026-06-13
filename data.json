@@ -1,5 +1,5 @@
 {
-  "version": 1781383701721,
+  "version": 1781384251110,
   "products": [
     {
       "id": "KAB-001",
@@ -176,8 +176,8 @@
       "eta": "ETA: 30 minutes"
     },
     "social": {
-      "discord": "https://discord.gg/your-invite",
-      "discordHandle": "discord.gg/kernelab",
+      "discord": "https://discord.gg/WJQqPftH6u",
+      "discordHandle": "Discord",
       "telegram": "https://t.me/your_channel",
       "telegramHandle": "@kernelab_support"
     },
