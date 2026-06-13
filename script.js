@@ -1075,3 +1075,37 @@ document.querySelectorAll(".pay-method").forEach(btn => {
     fl.innerHTML = items.join('<span class="fl-sep">·</span>');
   }
 })();
+
+
+/* ===================================================================== *
+ * 13. FAQ + Terms + Privacy sections (rendered from settings)
+ * ===================================================================== */
+(function renderLegalSections() {
+  const s = Store.getSettings();
+
+  // FAQ accordion
+  const faqEl = document.getElementById("faqListMain");
+  if (faqEl) {
+    const faq = s.faq || [];
+    faqEl.innerHTML = faq.map((item, i) => `
+      <div class="faq-item" data-i="${i}">
+        <button class="faq-q" type="button">
+          <span class="faq-num">${String(i+1).padStart(2,"0")}</span>
+          <span class="faq-q-text">${(item.q || "").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>
+          <span class="faq-arrow">›</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">${(item.a || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>")}</div></div>
+      </div>
+    `).join("") || `<p class="ape-hint" style="text-align:center">No questions configured yet.</p>`;
+    faqEl.querySelectorAll(".faq-q").forEach(b => b.addEventListener("click", () => b.parentElement.classList.toggle("open")));
+  }
+
+  // Terms + Privacy text content
+  function fmtLegal(t) {
+    return String(t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n\n/g,"</p><p>").replace(/\n/g,"<br>");
+  }
+  const termsEl = document.getElementById("legal-terms-main");
+  if (termsEl) termsEl.innerHTML = "<p>" + fmtLegal(s.terms) + "</p>";
+  const privEl = document.getElementById("legal-privacy-main");
+  if (privEl) privEl.innerHTML = "<p>" + fmtLegal(s.privacy) + "</p>";
+})();
