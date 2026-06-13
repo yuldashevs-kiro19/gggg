@@ -946,7 +946,7 @@ const promoStatus = document.getElementById("promoStatus");
 let currentPay = { product: null, tier: null, basePrice: 0, finalPrice: 0, discount: 0 };
 
 function openPayment(product, tier) {
-  currentPay = { product, tier, basePrice: tier.price, finalPrice: tier.price, discount: 0 };
+  currentPay = { product, tier, basePrice: tier.price, finalPrice: tier.price, discount: 0, promoCode: "" };
   payPlan.textContent  = tier.dur;
   payPrice.textContent = "$" + tier.price;
   payPromo.value = "";
@@ -984,21 +984,68 @@ promoApply.addEventListener("click", () => {
   const code = (payPromo.value || "").trim().toUpperCase();
   if (!code) return;
   const settings = Store.getSettings();
-  const codes = settings.discountCodes || {};
-  if (codes[code]) {
-    const pct = codes[code];
+  const promos = settings.promoCodes || [];
+  const promo = promos.find(p => p.code === code);
+  // Fallback to legacy simple discountCodes
+  const legacyPct = settings.discountCodes && settings.discountCodes[code];
+
+  function reject(reason) {
+    promoStatus.textContent = "✗ " + reason;
+    promoStatus.className = "promo-status err";
+    currentPay.discount = 0;
+    currentPay.finalPrice = currentPay.basePrice;
+    payPrice.textContent = "$" + currentPay.basePrice;
+  }
+
+  if (promo) {
+    if (promo.disabled) return reject("Code is disabled");
+    const now = Date.now();
+    if (promo.startDate && new Date(promo.startDate).getTime() > now) return reject("Code not active yet");
+    if (promo.endDate && new Date(promo.endDate).getTime() < now) return reject("Code has expired");
+
+    const orders = Store.getOrders();
+    if (promo.useLimit) {
+      const used = orders.filter(o => (o.promo || "").toUpperCase() === code).length;
+      if (used >= promo.useLimit) return reject("Code usage limit reached");
+    }
+    const email = (payEmail.value || "").trim().toLowerCase();
+    if (promo.perCustomerLimit && email) {
+      const usedByThis = orders.filter(o => (o.promo || "").toUpperCase() === code && (o.email || "").toLowerCase() === email).length;
+      if (usedByThis >= promo.perCustomerLimit) return reject("You've already used this code");
+    }
+    if (promo.minOrderValue && currentPay.basePrice < promo.minOrderValue) return reject(`Minimum order $${promo.minOrderValue}`);
+    if (promo.emailAllowlist && promo.emailAllowlist.length && (!email || !promo.emailAllowlist.includes(email))) return reject("This code is restricted to specific emails");
+    if (promo.productIds && promo.productIds.length && !promo.productIds.includes(currentPay.product.id)) return reject("Code not eligible for this product");
+    // Method check happens at method click time
+
+    let savedAmount;
+    if (promo.type === "fixed") {
+      savedAmount = Math.min(promo.discount, currentPay.basePrice);
+      currentPay.finalPrice = Math.max(0, currentPay.basePrice - promo.discount);
+      currentPay.discount = savedAmount;
+      promoStatus.textContent = `✓ −$${savedAmount} applied`;
+    } else {
+      savedAmount = Math.round(currentPay.basePrice * promo.discount / 100);
+      currentPay.finalPrice = currentPay.basePrice - savedAmount;
+      currentPay.discount = promo.discount;
+      promoStatus.textContent = `✓ ${promo.discount}% off applied`;
+    }
+    promoStatus.className = "promo-status ok";
+    payPrice.textContent = "$" + currentPay.finalPrice;
+    currentPay.promoCode = code;
+    showToast(`Promo applied · <b>${code}</b>`, "PROMO");
+  } else if (legacyPct) {
+    // Old simple format
+    const pct = Number(legacyPct);
     currentPay.discount = pct;
     currentPay.finalPrice = Math.round(currentPay.basePrice * (1 - pct / 100));
     payPrice.textContent = "$" + currentPay.finalPrice;
     promoStatus.textContent = `✓ ${pct}% off applied`;
     promoStatus.className = "promo-status ok";
+    currentPay.promoCode = code;
     showToast(`Promo applied · <b>−${pct}%</b>`, "PROMO");
   } else {
-    promoStatus.textContent = "✗ Invalid or expired code";
-    promoStatus.className = "promo-status err";
-    currentPay.discount = 0;
-    currentPay.finalPrice = currentPay.basePrice;
-    payPrice.textContent = "$" + currentPay.basePrice;
+    reject("Invalid or expired code");
   }
 });
 
@@ -1025,6 +1072,7 @@ document.querySelectorAll(".pay-method").forEach(btn => {
       email,
       method,
       discount: currentPay.discount,
+      promo:    currentPay.promoCode || "",
       status: "pending",
     };
     try { Store.pushOrder(order); } catch (e) {}
@@ -1035,11 +1083,13 @@ document.querySelectorAll(".pay-method").forEach(btn => {
     const tmpl = tierLink || (settings.paymentLinks && settings.paymentLinks[method]) || "";
     if (tmpl) {
       const url = tmpl
-        .replace("{id}", encodeURIComponent(currentPay.product.id))
-        .replace("{tier}", encodeURIComponent(currentPay.tier.dur))
+        .replace("{id}",     encodeURIComponent(currentPay.product.id))
+        .replace("{tier}",   encodeURIComponent(currentPay.tier.dur))
         .replace("{amount}", encodeURIComponent(currentPay.finalPrice))
-        .replace("{email}", encodeURIComponent(email))
-        .replace("{order}", encodeURIComponent(order.id));
+        .replace("{email}",  encodeURIComponent(email))
+        .replace("{order}",  encodeURIComponent(order.id))
+        .replace("{promo}",  encodeURIComponent(currentPay.promoCode || ""))
+        .replace("{coupon}", encodeURIComponent(currentPay.promoCode || ""));
       window.open(url, "_blank", "noopener");
     } else {
       showToast("No payment URL configured for this method/tier", "WARN");

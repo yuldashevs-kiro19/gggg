@@ -203,6 +203,23 @@
     },
     siteName: "KERNELAB",
     discountCodes: { "KAB-DEMO": 15 },
+    promoCodes: [
+      {
+        id: "promo_demo",
+        code: "KAB-DEMO",
+        type: "percentage",
+        discount: 15,
+        startDate: "",
+        endDate: "",
+        useLimit: 0,
+        perCustomerLimit: 0,
+        minOrderValue: 0,
+        emailAllowlist: [],
+        productIds: [],
+        methods: [],
+        disabled: false,
+      },
+    ],
     wheel: {
       enabled: true,
       title: "SPIN THE WHEEL",
@@ -606,6 +623,20 @@ Last updated: 2026-06-01
       if (!s.maintenance)   s.maintenance = DEFAULT_SETTINGS.maintenance;
       if (!s.paymentLinks)  s.paymentLinks = DEFAULT_SETTINGS.paymentLinks;
       if (!s.discountCodes) s.discountCodes = DEFAULT_SETTINGS.discountCodes;
+      // Migrate old discountCodes → promoCodes (one-time)
+      if (!s.promoCodes) {
+        s.promoCodes = Object.entries(s.discountCodes || {}).map(([code, pct]) => ({
+          id: "promo_" + Math.random().toString(36).slice(2,8),
+          code: String(code).toUpperCase(),
+          type: "percentage",
+          discount: Number(pct) || 0,
+          startDate: "", endDate: "",
+          useLimit: 0, perCustomerLimit: 0,
+          minOrderValue: 0, emailAllowlist: [],
+          productIds: [], methods: [],
+          disabled: false,
+        }));
+      }
       if (!s.social)        s.social = DEFAULT_SETTINGS.social;
       if (!s.legal)         s.legal = DEFAULT_SETTINGS.legal;
       // Migrate legacy paths to in-page anchors

@@ -102,6 +102,7 @@
         <button class="as-link" data-section="products"><span class="as-ico">◇</span> Products</button>
         <button class="as-link" data-section="reviews"><span class="as-ico">★</span> Reviews</button>
         <button class="as-link" data-section="games"><span class="as-ico">◎</span> Games</button>
+        <button class="as-link" data-section="promos"><span class="as-ico">%</span> Promo Codes</button>
         <button class="as-link" data-section="orders"><span class="as-ico">$</span> Orders</button>
         <button class="as-link" data-section="analytics"><span class="as-ico">∿</span> Analytics</button>
         <button class="as-link" data-section="settings"><span class="as-ico">⚙</span> Settings</button>
@@ -348,6 +349,23 @@
     },
     siteName: "KERNELAB",
     discountCodes: { "KAB-DEMO": 15 },
+    promoCodes: [
+      {
+        id: "promo_demo",
+        code: "KAB-DEMO",
+        type: "percentage",
+        discount: 15,
+        startDate: "",
+        endDate: "",
+        useLimit: 0,
+        perCustomerLimit: 0,
+        minOrderValue: 0,
+        emailAllowlist: [],
+        productIds: [],
+        methods: [],
+        disabled: false,
+      },
+    ],
     wheel: {
       enabled: true,
       title: "SPIN THE WHEEL",
@@ -751,6 +769,20 @@ Last updated: 2026-06-01
       if (!s.maintenance)   s.maintenance = DEFAULT_SETTINGS.maintenance;
       if (!s.paymentLinks)  s.paymentLinks = DEFAULT_SETTINGS.paymentLinks;
       if (!s.discountCodes) s.discountCodes = DEFAULT_SETTINGS.discountCodes;
+      // Migrate old discountCodes → promoCodes (one-time)
+      if (!s.promoCodes) {
+        s.promoCodes = Object.entries(s.discountCodes || {}).map(([code, pct]) => ({
+          id: "promo_" + Math.random().toString(36).slice(2,8),
+          code: String(code).toUpperCase(),
+          type: "percentage",
+          discount: Number(pct) || 0,
+          startDate: "", endDate: "",
+          useLimit: 0, perCustomerLimit: 0,
+          minOrderValue: 0, emailAllowlist: [],
+          productIds: [], methods: [],
+          disabled: false,
+        }));
+      }
       if (!s.social)        s.social = DEFAULT_SETTINGS.social;
       if (!s.legal)         s.legal = DEFAULT_SETTINGS.legal;
       // Migrate legacy paths to in-page anchors
@@ -1040,6 +1072,7 @@ const SECTIONS = {
   products:  { title: "Products",  render: renderProducts },
   reviews:   { title: "Reviews",   render: renderReviews },
   games:     { title: "Games",     render: renderGames },
+  promos:    { title: "Promo Codes", render: renderPromos },
   orders:    { title: "Orders",    render: renderOrders },
   analytics: { title: "Analytics", render: renderAnalytics },
   settings:  { title: "Settings",  render: renderSettings },
@@ -1321,7 +1354,10 @@ function renderProducts(root) {
   `;
   function paint(filter="") {
     const f = filter.trim().toLowerCase();
-    const sorted = [...products].sort((a,b) => (a.sort ?? 100) - (b.sort ?? 100) || (a.name||"").localeCompare(b.name||""));
+    // Persist sort order so admin's drag results survive across sections.
+    // We always read fresh from store to avoid stale state.
+    const all = Store.getProducts();
+    const sorted = [...all].sort((a,b) => (a.sort ?? 100) - (b.sort ?? 100) || (a.name||"").localeCompare(b.name||""));
     const filtered = !f ? sorted : sorted.filter(p => p.name.toLowerCase().includes(f) || p.id.toLowerCase().includes(f));
     $("#prodGrid").innerHTML = filtered.map(p => {
       const allTiers = Store.makePrices(p);
@@ -1368,6 +1404,51 @@ function renderProducts(root) {
       }
     }));
     $$(".prod-card").forEach(c => c.addEventListener("click", () => openProductEditor(c.dataset.id)));
+
+    // ===== Drag-and-drop reordering for product cards =====
+    let dragId = null;
+    $$(".prod-card").forEach(card => {
+      card.draggable = true;
+      card.addEventListener("dragstart", e => {
+        // Don't start drag from action buttons — let those clicks go through
+        if (e.target.closest("[data-action]")) { e.preventDefault(); return; }
+        dragId = card.dataset.id;
+        card.classList.add("dragging");
+        try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragId); } catch(_){}
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+        $$(".prod-card").forEach(c => c.classList.remove("drag-over"));
+        dragId = null;
+      });
+      card.addEventListener("dragover", e => {
+        if (!dragId || card.dataset.id === dragId) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = "move"; } catch(_){}
+        $$(".prod-card").forEach(c => c.classList.toggle("drag-over", c === card));
+      });
+      card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+      card.addEventListener("drop", e => {
+        e.preventDefault();
+        if (!dragId || card.dataset.id === dragId) return;
+        // Reorder by re-numbering sort field — keeps everything else stable
+        const all = Store.getProducts();
+        const visible = [...all].sort((a,b) => (a.sort ?? 100) - (b.sort ?? 100) || (a.name||"").localeCompare(b.name||""));
+        const fromIdx = visible.findIndex(p => p.id === dragId);
+        const toIdx   = visible.findIndex(p => p.id === card.dataset.id);
+        if (fromIdx < 0 || toIdx < 0) return;
+        const [moved] = visible.splice(fromIdx, 1);
+        visible.splice(toIdx, 0, moved);
+        // Renumber sort with step 10 starting from 10 — leaves room for manual tweaks
+        visible.forEach((p, i) => { p.sort = (i + 1) * 10; });
+        // Save back — preserve products not in visible (none usually, but safe)
+        const idMap = new Map(visible.map(p => [p.id, p]));
+        const updated = all.map(p => idMap.get(p.id) || p);
+        Store.setProducts(updated);
+        showToast(`Reordered · ${moved.name} → position ${toIdx + 1}`, "ORDER");
+        paint(filter);
+      });
+    });
   }
   paint();
   $("#prodSearch").addEventListener("input", e => paint(e.target.value));
@@ -1378,15 +1459,24 @@ function renderProducts(root) {
 function openProductEditor(id) {
   const games = Store.getGames();
   const isNew = !id;
-  const p = id ? Store.getProduct(id) : {
-    id: "KAB-" + String(Store.getProducts().length + 1).padStart(3, "0"),
-    name: "", short: "", clear: "S", base: 5, status: "NEW", rating: 5.0,
-    sort: 100, badges: [],
-    desc: "", tags: [], games: [],
-    features: { aim: [], visual: [], misc: [] },
-    req: { os: "Windows 10/11 x64", cpu: "—", ram: "—", driver: "—", net: "—" },
-    images: [], reviews: [], videoUrl: "",
-  };
+  const p = id ? Store.getProduct(id) : (function() {
+    // Generate unique ID — find max existing KAB-NNN, increment
+    const existing = Store.getProducts();
+    let maxN = 0;
+    existing.forEach(x => {
+      const m = /^KAB-(\d+)$/.exec(x.id || "");
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+    });
+    return {
+      id: "KAB-" + String(maxN + 1).padStart(3, "0"),
+      name: "", short: "", clear: "S", base: 5, status: "NEW", rating: 5.0,
+      sort: 100, badges: [],
+      desc: "", tags: [], games: [],
+      features: { aim: [], visual: [], misc: [] },
+      req: { os: "Windows 10/11 x64", cpu: "—", ram: "—", driver: "—", net: "—" },
+      images: [], reviews: [], videoUrl: "",
+    };
+  })();
   const editor = document.createElement("div");
   editor.className = "ap-editor open";
   editor.innerHTML = `
@@ -1540,6 +1630,7 @@ function openProductEditor(id) {
     list.innerHTML = productTiers.map((t, i) => `
       <div class="tier-row" data-i="${i}">
         <div class="tier-row-head">
+          <span class="tier-drag" title="Drag to reorder">⋮⋮</span>
           <span class="tier-row-num">${String(i+1).padStart(2,"0")}</span>
           <input class="ape-input" data-tf="dur" placeholder="e.g. 6 hours, 1 day, Lifetime" value="${escapeHtml(t.dur||"")}"/>
           <span class="tier-row-currency">$</span>
@@ -1569,6 +1660,40 @@ function openProductEditor(id) {
       if (!productTiers.length) productTiers.push({ dur: "", price: 0, links: {} });
       paintTiers();
     }));
+
+    // ----- Drag-and-drop reordering -----
+    let dragIdx = null;
+    $$(".tier-row", editor).forEach(row => {
+      const handle = row.querySelector(".tier-drag");
+      // Activate drag only when grabbing the handle (so inputs don't interfere)
+      handle.addEventListener("mousedown", () => { row.draggable = true; });
+      row.addEventListener("dragstart", e => {
+        dragIdx = Number(row.dataset.i);
+        row.classList.add("dragging");
+        try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragIdx)); } catch(_){}
+      });
+      row.addEventListener("dragend", () => {
+        row.classList.remove("dragging");
+        row.draggable = false;
+        $$(".tier-row", editor).forEach(r => r.classList.remove("drag-over"));
+        dragIdx = null;
+      });
+      row.addEventListener("dragover", e => {
+        if (dragIdx == null) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = "move"; } catch(_){}
+        $$(".tier-row", editor).forEach(r => r.classList.toggle("drag-over", r === row && Number(r.dataset.i) !== dragIdx));
+      });
+      row.addEventListener("drop", e => {
+        e.preventDefault();
+        const targetIdx = Number(row.dataset.i);
+        if (dragIdx == null || dragIdx === targetIdx) return;
+        const moved = productTiers.splice(dragIdx, 1)[0];
+        productTiers.splice(targetIdx, 0, moved);
+        dragIdx = null;
+        paintTiers();
+      });
+    });
   }
   paintTiers();
   $("#tiersAdd", editor).addEventListener("click", () => {
@@ -2004,6 +2129,264 @@ function renderAnalytics(root) {
     if (i % 3 === 0) html += `<text x="${x + bw/2}" y="${h - 6}" text-anchor="middle" font-family="Share Tech Mono" font-size="9" fill="rgba(255,255,255,0.5)">${d.label}</text>`;
   });
   svgH.innerHTML = html;
+}
+
+/* ===================================================================== *
+ *  SECTION: PROMO CODES — full CRUD with rules
+ * ===================================================================== */
+function renderPromos(root) {
+  const orders = Store.getOrders();
+  function paint() {
+    const s = Store.getSettings();
+    const promos = s.promoCodes || [];
+    root.innerHTML = `
+      <div class="ap-toolbar">
+        <button class="btn btn-primary" id="pcAdd" type="button">+ NEW PROMO CODE</button>
+        <span class="ap-meta">${promos.length} promo codes</span>
+      </div>
+      <div class="ap-card">
+        <table class="ap-table">
+          <thead><tr><th>CODE</th><th>TYPE</th><th>VALUE</th><th>ACTIVE</th><th>USAGE</th><th>STATUS</th><th></th></tr></thead>
+          <tbody id="promoBody"></tbody>
+        </table>
+      </div>
+    `;
+    const body = document.getElementById("promoBody");
+    body.innerHTML = promos.map(p => {
+      const used = orders.filter(o => o.promo === p.code).length;
+      const limit = p.useLimit ? p.useLimit : "∞";
+      const now = Date.now();
+      let status = "active";
+      if (p.disabled) status = "disabled";
+      else if (p.endDate && new Date(p.endDate).getTime() < now) status = "expired";
+      else if (p.startDate && new Date(p.startDate).getTime() > now) status = "scheduled";
+      else if (p.useLimit && used >= p.useLimit) status = "exhausted";
+      const valueLabel = p.type === "percentage" ? `${p.discount}%` : `$${p.discount}`;
+      const window_ = (p.startDate ? new Date(p.startDate).toLocaleDateString() : "now") + " → " + (p.endDate ? new Date(p.endDate).toLocaleDateString() : "∞");
+      return `
+        <tr>
+          <td><code>${escapeHtml(p.code)}</code></td>
+          <td>${p.type}</td>
+          <td><b>${valueLabel}</b></td>
+          <td>${window_}</td>
+          <td>${used} / ${limit}</td>
+          <td><span class="status-pill ${status}">${status}</span></td>
+          <td>
+            <button class="btn-sm" data-edit="${p.id}">EDIT</button>
+            <button class="btn-sm danger" data-del="${p.id}">DEL</button>
+          </td>
+        </tr>
+      `;
+    }).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No promo codes yet — click + NEW PROMO CODE</td></tr>`;
+    $$("#promoBody [data-edit]").forEach(b => b.addEventListener("click", () => openPromoEditor(b.dataset.edit, paint)));
+    $$("#promoBody [data-del]").forEach(b => b.addEventListener("click", async () => {
+      if (await confirmAsk("Delete promo", "Permanently remove this promo code?")) {
+        const ns = Store.getSettings();
+        ns.promoCodes = (ns.promoCodes || []).filter(x => x.id !== b.dataset.del);
+        Store.setSettings(ns);
+        showToast("Promo deleted", "PROMO");
+        paint();
+      }
+    }));
+  }
+  paint();
+  document.getElementById("pcAdd").addEventListener("click", () => openPromoEditor(null, paint));
+}
+
+function openPromoEditor(id, onDone) {
+  const products = Store.getProducts();
+  const settings = Store.getSettings();
+  const isNew = !id;
+  const p = id
+    ? (settings.promoCodes || []).find(x => x.id === id) || null
+    : {
+        id: "promo_" + Math.random().toString(36).slice(2, 8),
+        code: "", type: "percentage", discount: 10,
+        startDate: "", endDate: "",
+        useLimit: 0, perCustomerLimit: 0,
+        minOrderValue: 0, emailAllowlist: [],
+        productIds: [], methods: [],
+        disabled: false,
+      };
+  if (!p) { showToast("Promo not found", "ERROR", "err"); return; }
+
+  const editor = document.createElement("div");
+  editor.className = "ap-editor open";
+  editor.innerHTML = `
+    <div class="payment-backdrop" data-close="1"></div>
+    <div class="ap-editor-panel">
+      <div class="wc-corner tl"></div><div class="wc-corner tr"></div>
+      <div class="wc-corner bl"></div><div class="wc-corner br"></div>
+      <header class="ape-head">
+        <div>
+          <span class="kicker">// ${isNew ? "NEW PROMO CODE" : "EDIT PROMO CODE"}</span>
+          <h3>${isNew ? "Create promo" : escapeHtml(p.code) || "Promo"}</h3>
+        </div>
+        <button class="payment-close" data-close="1">×</button>
+      </header>
+
+      <div class="promo-grid">
+        <div class="promo-col">
+          <div class="ap-card" style="margin:0">
+            <div class="ap-head"><span class="kicker">// GENERAL</span></div>
+            <label class="ape-label">CODE</label>
+            <div class="ape-row">
+              <input class="ape-input" id="pcCode" value="${escapeHtml(p.code)}" placeholder="SAVE10" style="text-transform:uppercase;letter-spacing:2px;font-weight:700"/>
+              <button class="btn btn-ghost btn-sm" id="pcGen" type="button">⤬ GENERATE</button>
+            </div>
+
+            <label class="ape-label" style="margin-top:14px">TYPE</label>
+            <div class="ape-row">
+              <label class="ape-chip"><input type="radio" name="pcType" value="percentage" ${p.type==="percentage"?"checked":""}/> % Percentage</label>
+              <label class="ape-chip"><input type="radio" name="pcType" value="fixed" ${p.type==="fixed"?"checked":""}/> $ Fixed Amount</label>
+            </div>
+
+            <label class="ape-label" style="margin-top:14px">DISCOUNT</label>
+            <div class="ape-row">
+              <input class="ape-input" id="pcDiscount" type="number" min="0" step="0.01" value="${p.discount}" style="max-width:140px"/>
+              <span class="pc-unit" id="pcUnit">${p.type==="percentage"?"%":"$"}</span>
+              <span class="pc-quick">
+                ${[5,10,15,20,25,50,100].map(n => `<button class="btn-sm" data-quick="${n}" type="button">${n}</button>`).join("")}
+              </span>
+            </div>
+          </div>
+
+          <div class="ap-card" style="margin:0">
+            <div class="ap-head"><span class="kicker">// SCHEDULE & LIMITS</span></div>
+            <div class="ape-grid">
+              <div>
+                <label class="ape-label">START DATE (optional)</label>
+                <input class="ape-input" id="pcStart" type="datetime-local" value="${p.startDate||""}"/>
+                <span class="ape-hint">Empty → active immediately.</span>
+              </div>
+              <div>
+                <label class="ape-label">END DATE (optional)</label>
+                <input class="ape-input" id="pcEnd" type="datetime-local" value="${p.endDate||""}"/>
+                <span class="ape-hint">Empty → no expiration.</span>
+              </div>
+              <div>
+                <label class="ape-label">USE LIMIT (total)</label>
+                <input class="ape-input" id="pcLimit" type="number" min="0" value="${p.useLimit||""}" placeholder="unlimited"/>
+              </div>
+              <div>
+                <label class="ape-label">PER-CUSTOMER LIMIT</label>
+                <input class="ape-input" id="pcPerCust" type="number" min="0" value="${p.perCustomerLimit||""}" placeholder="unlimited"/>
+              </div>
+              <div class="ape-full">
+                <label class="ape-label">MINIMUM ORDER VALUE (USD)</label>
+                <input class="ape-input" id="pcMinOrder" type="number" min="0" step="0.01" value="${p.minOrderValue||""}" placeholder="no minimum"/>
+              </div>
+              <div class="ape-full">
+                <label class="ape-label">EMAIL ALLOWLIST (optional)</label>
+                <input class="ape-input" id="pcEmails" value="${(p.emailAllowlist||[]).join(", ")}" placeholder="email@example.com, another@example.com"/>
+                <span class="ape-hint">Comma-separated. Empty → any email allowed.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="promo-col">
+          <div class="ap-card" style="margin:0">
+            <div class="ap-head"><span class="kicker">// PRODUCTS</span></div>
+            <label class="ape-chip" style="margin-bottom:10px"><input type="checkbox" id="pcAllProducts" ${(p.productIds||[]).length===0?"checked":""}/> Apply to All Products</label>
+            <div id="pcProductPick" style="${(p.productIds||[]).length===0?"display:none":""}">
+              <span class="ape-hint" style="display:block;margin-bottom:6px">Specific products only:</span>
+              <div class="ape-chips">
+                ${products.map(pr => `<label class="ape-chip"><input type="checkbox" data-pid value="${pr.id}" ${(p.productIds||[]).includes(pr.id)?"checked":""}/> ${escapeHtml(pr.name)}</label>`).join("")}
+              </div>
+            </div>
+          </div>
+
+          <div class="ap-card" style="margin:0">
+            <div class="ap-head"><span class="kicker">// PAYMENT METHODS</span></div>
+            <span class="ape-hint" style="display:block;margin-bottom:6px">Empty = all methods allowed.</span>
+            <div class="ape-chips">
+              ${["ru","eu","ltc","btc"].map(m => `<label class="ape-chip"><input type="checkbox" data-pm value="${m}" ${(p.methods||[]).includes(m)?"checked":""}/> ${m.toUpperCase()}</label>`).join("")}
+            </div>
+          </div>
+
+          <div class="ap-card" style="margin:0">
+            <div class="ap-head">
+              <span class="kicker">// STATUS</span>
+              <label class="ap-toggle"><input type="checkbox" id="pcDisabled" ${p.disabled?"checked":""}/><span class="ap-toggle-track"></span><span class="ap-toggle-label">${p.disabled?"DISABLED":"ENABLED"}</span></label>
+            </div>
+            <span class="ape-hint">When disabled, code is rejected even if not expired.</span>
+          </div>
+        </div>
+      </div>
+
+      <footer class="ape-foot">
+        <button class="btn btn-ghost" data-close="1">CANCEL</button>
+        <button class="btn btn-primary" id="pcSave" type="button">${isNew?"CREATE PROMO":"SAVE CHANGES"}</button>
+      </footer>
+    </div>
+  `;
+  document.body.appendChild(editor);
+  document.body.style.overflow = "hidden";
+
+  function close() { editor.remove(); if (!document.querySelector(".ap-editor.open")) document.body.style.overflow = ""; }
+  editor.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", close));
+
+  // Generate code button
+  $("#pcGen", editor).addEventListener("click", () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random()*chars.length)];
+    $("#pcCode", editor).value = s;
+  });
+
+  // Quick discount chips
+  $$("[data-quick]", editor).forEach(b => b.addEventListener("click", () => {
+    $("#pcDiscount", editor).value = b.dataset.quick;
+  }));
+
+  // Type radio updates unit indicator
+  $$("input[name='pcType']", editor).forEach(r => r.addEventListener("change", () => {
+    $("#pcUnit", editor).textContent = r.value === "percentage" ? "%" : "$";
+  }));
+
+  // Apply to all toggle
+  $("#pcAllProducts", editor).addEventListener("change", e => {
+    $("#pcProductPick", editor).style.display = e.target.checked ? "none" : "";
+  });
+
+  // Disabled toggle label
+  $("#pcDisabled", editor).addEventListener("change", e => {
+    e.target.parentElement.querySelector(".ap-toggle-label").textContent = e.target.checked ? "DISABLED" : "ENABLED";
+  });
+
+  $("#pcSave", editor).addEventListener("click", () => {
+    const code = $("#pcCode", editor).value.trim().toUpperCase();
+    if (!code) { showToast("Code required", "ERROR", "err"); return; }
+    const allProducts = $("#pcAllProducts", editor).checked;
+    const newPromo = {
+      id: p.id,
+      code,
+      type: ($$('input[name="pcType"]:checked', editor)[0] || {}).value || "percentage",
+      discount: Number($("#pcDiscount", editor).value) || 0,
+      startDate: $("#pcStart", editor).value,
+      endDate:   $("#pcEnd", editor).value,
+      useLimit:        Number($("#pcLimit", editor).value) || 0,
+      perCustomerLimit: Number($("#pcPerCust", editor).value) || 0,
+      minOrderValue:   Number($("#pcMinOrder", editor).value) || 0,
+      emailAllowlist: $("#pcEmails", editor).value.split(",").map(x => x.trim().toLowerCase()).filter(Boolean),
+      productIds: allProducts ? [] : $$("[data-pid]:checked", editor).map(i => i.value),
+      methods: $$("[data-pm]:checked", editor).map(i => i.value),
+      disabled: $("#pcDisabled", editor).checked,
+    };
+    const ns = Store.getSettings();
+    ns.promoCodes = ns.promoCodes || [];
+    const idx = ns.promoCodes.findIndex(x => x.id === p.id);
+    if (idx >= 0) ns.promoCodes[idx] = newPromo;
+    else ns.promoCodes.push(newPromo);
+    // Mirror to legacy discountCodes for back-compat
+    ns.discountCodes = {};
+    ns.promoCodes.forEach(pc => { if (pc.type === "percentage" && !pc.disabled) ns.discountCodes[pc.code] = pc.discount; });
+    Store.setSettings(ns);
+    showToast(`${isNew ? "Created" : "Saved"} <b>${code}</b>`, "PROMO");
+    close();
+    onDone && onDone();
+  });
 }
 
 /* ===================================================================== *
