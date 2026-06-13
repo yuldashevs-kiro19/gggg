@@ -231,9 +231,9 @@
       telegramHandle: "@kernelab_support",
     },
     legal: {
-      faqUrl:     "faq.html",
-      termsUrl:   "terms.html",
-      privacyUrl: "terms.html#privacy",
+      faqUrl:     "#faq",
+      termsUrl:   "#terms",
+      privacyUrl: "#privacy",
     },
     launchDate: new Date(Date.now() - 240 * 86400e3).toISOString(),
     faq: [
@@ -519,11 +519,11 @@ Last updated: 2026-06-01
       if (!s.discountCodes) s.discountCodes = DEFAULT_SETTINGS.discountCodes;
       if (!s.social)        s.social = DEFAULT_SETTINGS.social;
       if (!s.legal)         s.legal = DEFAULT_SETTINGS.legal;
-      // Migrate legacy absolute paths to relative
+      // Migrate legacy paths to in-page anchors
       if (s.legal) {
-        if (s.legal.faqUrl     === "/faq.html")           s.legal.faqUrl     = "faq.html";
-        if (s.legal.termsUrl   === "/terms.html")         s.legal.termsUrl   = "terms.html";
-        if (s.legal.privacyUrl === "/terms.html#privacy") s.legal.privacyUrl = "terms.html#privacy";
+        if (s.legal.faqUrl     === "/faq.html"           || s.legal.faqUrl     === "faq.html")           s.legal.faqUrl     = "#faq";
+        if (s.legal.termsUrl   === "/terms.html"         || s.legal.termsUrl   === "terms.html")         s.legal.termsUrl   = "#terms";
+        if (s.legal.privacyUrl === "/terms.html#privacy" || s.legal.privacyUrl === "terms.html#privacy") s.legal.privacyUrl = "#privacy";
       }
       if (!s.faq)           s.faq = DEFAULT_SETTINGS.faq;
       if (!s.terms)         s.terms = DEFAULT_SETTINGS.terms;
@@ -546,6 +546,42 @@ Last updated: 2026-06-01
       Object.values(KEYS).forEach(k => localStorage.removeItem(k));
       Media.clear().catch(()=>{});
       this.seed();
+    },
+
+    /* ===== Publish / Sync with server-side data.json ===== */
+
+    // Snapshot of admin-controlled data (no per-visitor stuff like orders/clicks)
+    exportData() {
+      return {
+        version: Date.now(),
+        products: this.getProducts(),
+        games:    this.getGames(),
+        settings: this.getSettings(),
+      };
+    },
+
+    // Replace local store from a snapshot object
+    importData(obj) {
+      if (!obj || typeof obj !== "object") return false;
+      if (Array.isArray(obj.products)) writeJSON(KEYS.products, obj.products);
+      if (Array.isArray(obj.games))    writeJSON(KEYS.games, obj.games);
+      if (obj.settings)                writeJSON(KEYS.settings, obj.settings);
+      return true;
+    },
+
+    // Synchronously fetch data.json (called by main page on load).
+    // Replaces local catalogue with server-published state.
+    // Synchronous XHR is deprecated but ideal here: small one-time fetch
+    // before any rendering, runs only on visitor pages.
+    syncFromServerSync() {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", "data.json?t=" + Date.now(), false);
+        xhr.send();
+        if (xhr.status !== 200) return false;
+        const data = JSON.parse(xhr.responseText);
+        return this.importData(data);
+      } catch (e) { return false; }
     },
 
     /* seed on first run — clean state, no fake history */

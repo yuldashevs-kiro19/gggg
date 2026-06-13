@@ -1149,6 +1149,25 @@ function renderSettings(root) {
       </div>
 
       <div class="ap-card">
+        <div class="ap-head"><span class="kicker">// PUBLISHING · GITHUB</span></div>
+        <p class="ape-hint">Push your local changes to <code>data.json</code> in your repo. Visitors fetch this file on every page load — changes go live within a minute.</p>
+        <div class="ape-grid">
+          <div><label class="ape-label">REPO (owner/name)</label><input class="ape-input" id="ghRepo" value="${escapeHtml(s.github?.repo || "")}" placeholder="username/repo-name"/></div>
+          <div><label class="ape-label">BRANCH</label><input class="ape-input" id="ghBranch" value="${escapeHtml(s.github?.branch || "main")}"/></div>
+          <div class="ape-full">
+            <label class="ape-label">PERSONAL ACCESS TOKEN</label>
+            <input class="ape-input" id="ghToken" type="password" value="${escapeHtml(s.github?.token || "")}" placeholder="github_pat_..."/>
+            <span class="ape-hint">Create at <code>github.com/settings/tokens?type=beta</code> · scope: <code>Contents: Read &amp; Write</code> for the repo above. Stored locally in your browser only.</span>
+          </div>
+        </div>
+        <div class="ape-row" style="margin-top:10px">
+          <button class="btn btn-primary" id="ghPublish">› PUBLISH TO GITHUB</button>
+          <button class="btn btn-ghost" id="ghPull">↓ PULL FROM SERVER</button>
+          <button class="btn btn-ghost" id="ghExport">⬇ EXPORT data.json</button>
+        </div>
+      </div>
+
+      <div class="ap-card">
         <div class="ap-head"><span class="kicker">// PAYMENT LINKS</span></div>
         <p class="ape-hint">Templates with placeholders: <code>{id}</code> <code>{tier}</code> <code>{amount}</code> <code>{email}</code> <code>{order}</code></p>
         <div class="ape-grid">
@@ -1366,7 +1385,82 @@ function renderSettings(root) {
     }
   });
 
+  // ----- GitHub Publishing -----
+  function saveGitHubSettings() {
+    const ns = Store.getSettings();
+    ns.github = {
+      repo:   $("#ghRepo").value.trim(),
+      branch: $("#ghBranch").value.trim() || "main",
+      token:  $("#ghToken").value.trim(),
+    };
+    Store.setSettings(ns);
+    return ns.github;
+  }
 
+  $("#ghExport").addEventListener("click", () => {
+    const data = Store.exportData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "data.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast("data.json downloaded — commit it to your repo", "EXPORT");
+  });
+
+  $("#ghPull").addEventListener("click", async () => {
+    if (!(await confirmAsk("Pull from server", "Replace local catalogue with the published data.json from GitHub Pages? Your unsaved local edits will be lost."))) return;
+    const ok = Store.syncFromServerSync();
+    if (ok) { showToast("Synced from server · refresh sections to see changes", "PULL"); navigate("dashboard"); }
+    else    { showToast("data.json not found on server (or fetch failed)", "ERROR", "err"); }
+  });
+
+  $("#ghPublish").addEventListener("click", async () => {
+    const gh = saveGitHubSettings();
+    if (!gh.repo || !gh.token) { showToast("Repo and token required", "ERROR", "err"); return; }
+    if (!/^[\w.-]+\/[\w.-]+$/.test(gh.repo)) { showToast("Repo format: owner/name", "ERROR", "err"); return; }
+    if (!(await confirmAsk("Publish to GitHub", `Push current catalogue to ${gh.repo}@${gh.branch}/data.json? This goes live to all visitors.`))) return;
+
+    const data = Store.exportData();
+    const json = JSON.stringify(data, null, 2);
+    const content = btoa(unescape(encodeURIComponent(json)));
+    const apiBase = `https://api.github.com/repos/${gh.repo}/contents/data.json`;
+    const headers = {
+      "Authorization": "Bearer " + gh.token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    };
+    showToast("Publishing...", "DEPLOY");
+    try {
+      let sha = null;
+      const getResp = await fetch(`${apiBase}?ref=${encodeURIComponent(gh.branch)}`, { headers });
+      if (getResp.ok) { const j = await getResp.json(); sha = j.sha; }
+      else if (getResp.status !== 404) {
+        showToast("API error: " + getResp.status + " " + getResp.statusText, "ERROR", "err");
+        return;
+      }
+      const putResp = await fetch(apiBase, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          message: `Publish data.json (${new Date().toISOString().slice(0,16).replace("T"," ")})`,
+          content,
+          branch: gh.branch,
+          ...(sha ? { sha } : {}),
+        }),
+      });
+      if (!putResp.ok) {
+        const txt = await putResp.text();
+        console.error("[publish] PUT failed:", putResp.status, txt);
+        showToast("Publish failed: " + putResp.status + " — see console", "ERROR", "err");
+        return;
+      }
+      showToast("✓ Published — visitors see updates within ~60s", "DEPLOY");
+    } catch (err) {
+      console.error("[publish] error:", err);
+      showToast("Publish failed: " + (err.message || err), "ERROR", "err");
+    }
+  });
 }
 
 

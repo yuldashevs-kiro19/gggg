@@ -5,6 +5,10 @@
  * ===================================================================== */
 const Store = window.KernelabStore;
 
+// Pull latest published catalogue from data.json (admin publishes via GitHub API).
+// If the file doesn't exist yet, falls through to local defaults.
+try { Store.syncFromServerSync(); } catch (e) {}
+
 /* ===== 0. Maintenance gate — short-circuit everything ===== */
 const __settings = Store.getSettings();
 if (__settings.maintenance && __settings.maintenance.enabled) {
