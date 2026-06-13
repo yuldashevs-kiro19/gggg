@@ -1408,15 +1408,53 @@ function renderSettings(root) {
   });
 
   // ----- GitHub Publishing -----
+  // Light obfuscation for the token so it doesn't sit plain in data.json.
+  // Not real crypto — anyone reading the source can recover the key.
+  const TOKEN_KEY = "kernelab-pat-shared-key-9k4fXq2-do-not-rename";
+  function xorEnc(text) {
+    if (!text) return "";
+    let out = "";
+    for (let i = 0; i < text.length; i++) out += String.fromCharCode(text.charCodeAt(i) ^ TOKEN_KEY.charCodeAt(i % TOKEN_KEY.length));
+    try { return btoa(unescape(encodeURIComponent(out))); } catch (e) { return ""; }
+  }
+  function xorDec(b64) {
+    if (!b64) return "";
+    try {
+      const str = decodeURIComponent(escape(atob(b64)));
+      let out = "";
+      for (let i = 0; i < str.length; i++) out += String.fromCharCode(str.charCodeAt(i) ^ TOKEN_KEY.charCodeAt(i % TOKEN_KEY.length));
+      return out;
+    } catch (e) { return ""; }
+  }
+  function getCurrentToken() {
+    const ns = Store.getSettings();
+    const enc = ns.github && ns.github.tokenEncrypted;
+    if (enc) return xorDec(enc);
+    // Migrate old plain token if present
+    const plain = ns.github && ns.github.token;
+    if (plain) {
+      ns.github.tokenEncrypted = xorEnc(plain);
+      delete ns.github.token;
+      Store.setSettings(ns);
+      return plain;
+    }
+    return "";
+  }
+  // Fill the form with the decrypted token (if any) so other admins see it pre-filled
+  const tokInp = $("#ghToken");
+  if (tokInp && !tokInp.value) tokInp.value = getCurrentToken();
+
   function saveGitHubSettings() {
     const ns = Store.getSettings();
+    const plain = $("#ghToken").value.trim();
     ns.github = {
       repo:   $("#ghRepo").value.trim(),
       branch: $("#ghBranch").value.trim() || "main",
-      token:  $("#ghToken").value.trim(),
+      tokenEncrypted: plain ? xorEnc(plain) : "",
     };
+    delete ns.github.token; // never store plain
     Store.setSettings(ns);
-    return ns.github;
+    return { repo: ns.github.repo, branch: ns.github.branch, token: plain };
   }
 
   $("#ghExport").addEventListener("click", () => {
@@ -1453,15 +1491,17 @@ function renderSettings(root) {
       "X-GitHub-Api-Version": "2022-11-28",
     };
     showToast("Publishing...", "DEPLOY");
-    try {
-      let sha = null;
-      const getResp = await fetch(`${apiBase}?ref=${encodeURIComponent(gh.branch)}`, { headers });
-      if (getResp.ok) { const j = await getResp.json(); sha = j.sha; }
-      else if (getResp.status !== 404) {
-        showToast("API error: " + getResp.status + " " + getResp.statusText, "ERROR", "err");
-        return;
-      }
-      const putResp = await fetch(apiBase, {
+
+    async function fetchSha() {
+      const r = await fetch(`${apiBase}?ref=${encodeURIComponent(gh.branch)}&_ts=${Date.now()}`, {
+        headers, cache: "no-store",
+      });
+      if (r.ok) { const j = await r.json(); return j.sha; }
+      if (r.status === 404) return null;
+      throw new Error(`GET sha failed ${r.status} ${r.statusText}`);
+    }
+    async function putContent(sha) {
+      return fetch(apiBase, {
         method: "PUT",
         headers,
         body: JSON.stringify({
@@ -1471,10 +1511,22 @@ function renderSettings(root) {
           ...(sha ? { sha } : {}),
         }),
       });
+    }
+    try {
+      let sha = await fetchSha();
+      let putResp = await putContent(sha);
+
+      // On 409 (SHA out-of-date), refetch and retry once
+      if (putResp.status === 409) {
+        await new Promise(r => setTimeout(r, 800));
+        sha = await fetchSha();
+        putResp = await putContent(sha);
+      }
+
       if (!putResp.ok) {
         const txt = await putResp.text();
         console.error("[publish] PUT failed:", putResp.status, txt);
-        showToast("Publish failed: " + putResp.status + " — see console", "ERROR", "err");
+        showToast(`Publish failed: ${putResp.status} — see console`, "ERROR", "err");
         return;
       }
       showToast("✓ Published — visitors see updates within ~60s", "DEPLOY");
