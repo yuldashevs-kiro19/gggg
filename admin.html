@@ -1729,7 +1729,11 @@ function openProductEditor(id) {
 
   // Save
   $("#fSave", editor).addEventListener("click", () => {
+    // Pull fresh existing record so we don't accidentally drop any field
+    // (reviews, custom metadata, etc) that the form doesn't render.
+    const existing = isNew ? {} : (Store.getProduct(p.id) || {});
     const newP = {
+      ...existing,
       id: $("#fId", editor).value.trim() || p.id,
       name: $("#fName", editor).value.trim(),
       short: $("#fShort", editor).value.trim().toUpperCase(),
@@ -1754,7 +1758,8 @@ function openProductEditor(id) {
       },
       images,
       videoUrl: $("#fVideoUrl", editor).value.trim(),
-      reviews: p.reviews || [],
+      // Preserve existing reviews — never overwrite from the editor (it doesn't show them)
+      reviews: (existing.reviews || p.reviews || []),
       badges: $$('#fBadges input:checked', editor).map(i => i.value),
       sort:   Number($("#fSort", editor).value) || 100,
       tiers: productTiers
@@ -1772,6 +1777,14 @@ function openProductEditor(id) {
     };
     if (!newP.name) { showToast("Name is required", "ERROR", "err"); return; }
     if (!newP.short) newP.short = newP.name.split(/\s+/)[0].toUpperCase();
+    // Guard against ID collision with another product
+    if (isNew) {
+      const existingById = Store.getProducts().find(x => x.id === newP.id);
+      if (existingById) {
+        showToast(`ID ${newP.id} already exists — pick a different ID`, "ERROR", "err");
+        return;
+      }
+    }
     Store.upsertProduct(newP);
     showToast(`${isNew ? "Created" : "Saved"} <b>${newP.name}</b>`, "PRODUCT");
     closeEditor();
