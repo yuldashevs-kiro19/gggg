@@ -1,5 +1,5 @@
 {
-  "version": 1781395186090,
+  "version": 1781428917083,
   "products": [
     {
       "id": "KAB-001",
@@ -255,14 +255,14 @@
           "dur": "Lifetime",
           "price": 199.99,
           "links": {
-            "ru": "",
+            "ru": "https://oplata.info/asp2/pay_wm.asp?id_d=5940305&lang=ru-RU",
             "eu": "",
             "ltc": "",
             "btc": ""
           }
         }
       ],
-      "videoUrl": "https://www.youtube.com/watch?v=umSEIXUbgVs&t=4s"
+      "videoUrl": ""
     },
     {
       "id": "KAB-002",
