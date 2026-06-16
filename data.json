@@ -1,5 +1,5 @@
 {
-  "version": 1781434347778,
+  "version": 1781625129641,
   "products": [
     {
       "id": "KAB-001",
@@ -529,7 +529,7 @@
         },
         {
           "dur": "7 days",
-          "price": 12.99,
+          "price": 17.99,
           "links": {
             "ru": "https://oplata.info/asp2/pay_wm.asp?id_d=5940122&lang=ru-RU",
             "eu": "",
